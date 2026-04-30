@@ -1,0 +1,17 @@
+ai-image-detective/                    # Main Directory
+├── .env                               # API key
+├── .gitignore
+├── requirements.txt
+├── README.md
+└── src/
+    ├── __init__.py
+    ├── config.py                      # Settings (model, prompts vs.)
+    ├── analyzer.py                    # Main Class 
+    ├── result.py                      # DetectionResult dataclass
+    └── main.py                        # CLI input point
+
+--------------------------------
+requirements;
+anthropic>=0.40.0
+python-dotenv>=1.0.0
+--------------------------------
