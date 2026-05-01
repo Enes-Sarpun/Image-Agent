@@ -1,14 +1,39 @@
-ai-image-detective/                    # Main Directory
-├── .env                               # API key
+Image Agent/
+├── .env
 ├── .gitignore
 ├── requirements.txt
 ├── README.md
+├── data/                              # SQLite 
+│   └── cache.db                      
 └── src/
     ├── __init__.py
-    ├── config.py                      # Settings (model, prompts vs.)
-    ├── analyzer.py                    # Main Class 
-    ├── result.py                      # DetectionResult dataclass
+    ├── config.py                      # All of Settings.
+    ├── result.py                      # AnalysisResult dataclass
+    │
+    ├── tools/                         # Agent's tools
+    │   ├── __init__.py
+    │   ├── image_hasher.py            # Image Hash
+    │   ├── exif_reader.py             # EXIF metadata
+    │   ├── watermark_detector.py      # Gemini sparkle detection
+    │   ├── llm_vision.py              # Gemini vision call
+    │   └── llm_with_search.py         # Gemini + Google Search
+    │
+    ├── cache/
+    │   ├── __init__.py
+    │   └── sqlite_cache.py            # SQLite cache
+    │
+    ├── agent.py                       # Main Agent
     └── main.py                        # CLI input point
 
 
 
+-----------------------------------------
+# İlk çalıştırma — tam akış
+python src/main.py test_image_gemini.png
+
+# İkinci çalıştırma — cache hit (çok hızlı olmalı)
+python src/main.py test_image_gemini.png
+
+# Cache'i atla, tekrar analiz et
+python src/main.py test_image_gemini.png --no-cache
+-----------------------------------------

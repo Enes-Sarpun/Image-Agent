@@ -1,29 +1,35 @@
 """
-Image Agent: Analiz sonucu için veri sınıfı.
+Image Agent: AnalysisResult dataclass.
 """
 
 from dataclasses import dataclass, field, asdict
 from typing import List
+from datetime import datetime
 
 
 @dataclass
 class AnalysisResult:
     """Görsel analizinin yapılandırılmış sonucu."""
 
-    verdict: str                              # "ai" veya "real"
-    confidence: float                         # 0-100
-    reasoning: str                            # Açıklama
+    verdict: str
+    confidence: float
+    reasoning: str
     key_indicators: List[str] = field(default_factory=list)
-    raw_response: str = ""                    # Ham LLM yanıtı (debug)
+
+    # Agent metadata
+    source: str = "unknown"           # "cache", "watermark", "llm", "llm_search"
+    elapsed_ms: float = 0.0
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    raw_response: str = ""
 
     def to_dict(self) -> dict:
-        """Dict'e çevir (JSON kaydetmek için)."""
         return asdict(self)
 
     def is_ai(self) -> bool:
-        """AI üretimi mi?"""
         return self.verdict.lower() == "ai"
 
     def is_high_confidence(self, threshold: float = 75.0) -> bool:
-        """Güven yüksek mi?"""
         return self.confidence >= threshold
+    
+
+    

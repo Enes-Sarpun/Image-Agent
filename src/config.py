@@ -1,12 +1,32 @@
 """
-Image Agent: Yapılandırma ve sabitler.
+Image Agent: All settings and constants.
 """
 
-# Model ayarları
+from pathlib import Path
+
+# Project paths
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = PROJECT_ROOT / "data" / "cache.db"
+
+# Gemini model settings
 MODEL_NAME = "gemini-2.5-flash"
 MAX_TOKENS = 1024
+TEMPERATURE = 0.2
 
-# LLM Promptları
+# Confidence thresholds
+WATERMARK_CONFIDENCE_THRESHOLD = 95.0
+LLM_CONFIDENCE_THRESHOLD = 75.0
+
+# Supported image formats
+SUPPORTED_FORMATS = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
+
+# LLM Prompts
 SYSTEM_PROMPT = """Sen, görsellerin AI tarafından mı üretildiğini yoksa gerçek bir fotoğraf mı olduğunu tespit eden uzman bir görsel analiz asistanısın.
 
 Görevin:
@@ -18,24 +38,20 @@ Görevin:
 Çıktı formatı (SADECE JSON, başka metin yok):
 {
   "verdict": "ai" veya "real",
-  "confidence": 0-100 arası bir sayı (yüzdelik güven oranı),
-  "reasoning": "Kararını desteklemek için 2-3 cümlelik gerekçe",
+  "confidence": 0-100 arası bir sayı,
+  "reasoning": "2-3 cümlelik gerekçe",
   "key_indicators": ["ipucu1", "ipucu2", "ipucu3"]
 }
 
 Önemli kurallar:
 - Sadece JSON döndür, başka açıklama yapma
-- Eğer kararsızsan confidence değerini 50-60 aralığında tut
-- key_indicators'da gözlemlediğin somut detaylar olsun
+- Kararsızsan confidence değerini 50-60 aralığında tut
+- key_indicators somut detaylar olsun
 - Gerekçeyi Türkçe yaz"""
 
 USER_PROMPT = "Bu görseli analiz et ve AI üretimi mi yoksa gerçek fotoğraf mı olduğunu belirt."
 
-# Desteklenen görsel formatları
-SUPPORTED_FORMATS = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-}
+SEARCH_PROMPT = """Bu görselin AI üretimi mi gerçek fotoğraf mı olduğundan emin değilim.
+Web'de bu görsele benzer kaynaklar ara, AI generator'larından üretilip üretilmediğine dair ipuçları bul.
+Reverse image search benzeri bir yaklaşımla, görselin orijinal kaynağını veya benzerlerini araştır.
+Sonucu yine aynı JSON formatında döndür."""
