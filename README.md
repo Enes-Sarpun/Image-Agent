@@ -1,6 +1,6 @@
 # Image Agent
 
-Claude API kullanarak görsellerin AI tarafından mı üretildiğini yoksa gerçek fotoğraf mı olduğunu tespit eden bir agent.
+Gemini API kullanarak görsellerin AI tarafından mı üretildiğini yoksa gerçek fotoğraf mı olduğunu tespit eden bir agent.
 
 ## Kurulum
 
