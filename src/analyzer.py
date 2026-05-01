@@ -1,14 +1,14 @@
 """
-Image Agent: Claude API ile görsel analizi.
+Image Agent: Gemini API ile görsel analizi.
 """
 
 import os
-import base64
 import json
 from pathlib import Path
 from typing import Union
 
-from anthropic import Anthropic
+import google.generativeai as genai
+from PIL import Image
 from dotenv import load_dotenv
 
 from config import (
@@ -22,36 +22,38 @@ from result import AnalysisResult
 
 
 class ImageAnalyzer:
-    """Görselleri Claude API kullanarak AI/Real olarak sınıflandırır."""
+    """Görselleri Gemini API kullanarak AI/Real olarak sınıflandırır."""
 
     def __init__(self, model: str = MODEL_NAME):
         load_dotenv()
 
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             raise ValueError(
-                "ANTHROPIC_API_KEY bulunamadı. .env dosyasını kontrol et."
+                "GEMINI_API_KEY bulunamadı. .env dosyasını kontrol et."
             )
 
-        self.client = Anthropic(api_key=api_key)
-        self.model = model
+        # Gemini SDK'yı yapılandır
+        genai.configure(api_key=api_key)
 
-    def _encode_image(self, image_path: Path) -> tuple[str, str]:
-        """Görseli base64'e çevir ve media type'ı belirle."""
+        # Modeli oluştur (system instruction ile)
+        self.model = genai.GenerativeModel(
+            model_name=model,
+            system_instruction=SYSTEM_PROMPT,
+            generation_config={
+                "max_output_tokens": MAX_TOKENS,
+                "temperature": 0.2,  # Tutarlı sonuçlar için düşük
+            }
+        )
+
+    def _validate_image(self, image_path: Path) -> None:
+        """Görsel formatının desteklenip desteklenmediğini kontrol et."""
         suffix = image_path.suffix.lower()
-
         if suffix not in SUPPORTED_FORMATS:
             raise ValueError(
                 f"Desteklenmeyen format: {suffix}. "
                 f"Desteklenen: {', '.join(SUPPORTED_FORMATS.keys())}"
             )
-
-        media_type = SUPPORTED_FORMATS[suffix]
-
-        with open(image_path, "rb") as f:
-            encoded = base64.standard_b64encode(f.read()).decode("utf-8")
-
-        return encoded, media_type
 
     def _parse_response(self, raw_text: str) -> dict:
         """LLM yanıtından JSON çıkar."""
@@ -60,7 +62,6 @@ class ImageAnalyzer:
         # ```json ... ``` ile sarılmışsa temizle
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            # İlk satırı (```json) ve son satırı (```) at
             if lines[-1].strip().startswith("```"):
                 cleaned = "\n".join(lines[1:-1])
             else:
@@ -80,37 +81,15 @@ class ImageAnalyzer:
         if not image_path.exists():
             raise FileNotFoundError(f"Görsel bulunamadı: {image_path}")
 
-        # Görseli encode et
-        image_data, media_type = self._encode_image(image_path)
+        self._validate_image(image_path)
 
-        # Claude'a gönder
-        message = self.client.messages.create(
-            model=self.model,
-            max_tokens=MAX_TOKENS,
-            system=SYSTEM_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": image_data,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": USER_PROMPT,
-                        },
-                    ],
-                }
-            ],
-        )
+        # PIL ile görseli yükle (Gemini SDK PIL Image obje kabul ediyor)
+        image = Image.open(image_path)
 
-        # Yanıtı parse et
-        raw_response = message.content[0].text
+        # Gemini'ye gönder
+        response = self.model.generate_content([USER_PROMPT, image])
+
+        raw_response = response.text
         parsed = self._parse_response(raw_response)
 
         return AnalysisResult(

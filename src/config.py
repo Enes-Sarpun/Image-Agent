@@ -1,9 +1,9 @@
 """
-Image Agent
+Image Agent: Yapılandırma ve sabitler.
 """
 
-# Model Settings
-MODEL_NAME = "claude-opus-4-7"
+# Model ayarları
+MODEL_NAME = "gemini-2.5-flash"
 MAX_TOKENS = 1024
 
 # LLM Promptları
