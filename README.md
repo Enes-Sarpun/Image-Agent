@@ -5,10 +5,10 @@ Gemini API kullanarak görsellerin AI tarafından mı üretildiğini yoksa gerç
 ## Özellikler
 
 - 🔍 Multi-stage analysis pipeline
-- 📊 SQLite cache (tekrar analiz yok)
+- 📊 SQLite cache 
 - 🎯 Forensic edge pattern detection
 - 🤖 Gemini Vision API entegrasyonu
-- 🔎 Web search fallback (düşük confidence için)
+- 🔎 Web search fallback 
 
 ## Kurulum
 
