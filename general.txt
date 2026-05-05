@@ -3,37 +3,127 @@ Image Agent/
 ├── .gitignore
 ├── requirements.txt
 ├── README.md
-├── data/                              # SQLite 
-│   └── cache.db                      
+├── data/                              # SQLite database
+│   └── cache.db                       # Auto-generated
+├── forensic_output/                   # Forensic test outputs (gitignored)
 └── src/
     ├── __init__.py
-    ├── config.py                      # All of Settings.
+    ├── config.py                      # All settings (model, prompts, thresholds)
     ├── result.py                      # AnalysisResult dataclass
     │
     ├── tools/                         # Agent's tools
     │   ├── __init__.py
-    │   ├── image_hasher.py            # Image Hash
-    │   ├── exif_reader.py             # EXIF metadata
-    │   ├── watermark_detector.py      # Gemini sparkle detection
-    │   ├── llm_vision.py              # Gemini vision call
-    │   └── llm_with_search.py         # Gemini + Google Search
+    │   ├── image_hasher.py            # Perceptual hash for cache key
+    │   ├── exif_reader.py             # EXIF metadata reader
+    │   ├── watermark_detector.py      # Gemini sparkle watermark detection
+    │   ├── forensic_analyzer.py       # ELA + FFT + Edge pattern analysis
+    │   ├── llm_vision.py              # Gemini vision call (with forensic context)
+    │   └── llm_with_search.py         # Gemini + Google Search fallback
     │
     ├── cache/
     │   ├── __init__.py
-    │   └── sqlite_cache.py            # SQLite cache
+    │   └── sqlite_cache.py            # SQLite cache manager
     │
-    ├── agent.py                       # Main Agent
-    └── main.py                        # CLI input point
+    ├── agent.py                       # Main orchestrator
+    ├── main.py                        # CLI entry point
+    └── test_forensic.py               # Forensic analyzer test script (optional)
 
 
+─────────────────────────────────────────────────────────────
+ANALYSIS PIPELINE
+─────────────────────────────────────────────────────────────
 
------------------------------------------
-# İlk çalıştırma — tam akış
+Image input
+    ↓
+[1/5] Image Hash (perceptual)
+    ↓
+[2/5] Cache check (SQLite)
+    ├─ Hit  → Return cached result (~100ms)
+    └─ Miss ↓
+        ↓
+[3/5] Quick checks
+    ├─ EXIF metadata (camera info, software)
+    └─ Watermark detection (Gemini sparkle)
+        ├─ Watermark found (>95% conf) → Return (~300ms)
+        └─ Not found ↓
+            ↓
+[4/5] Forensic preprocessing
+    ├─ ELA (Error Level Analysis)
+    ├─ FFT magnitude map
+    ├─ Edge density map
+    ├─ Edge pattern analysis (uniformity, repetition)
+    └─ AI likelihood score (0-100)
+        ↓
+[5/5] LLM Vision (Gemini Flash)
+    └─ Forensic context injected into prompt
+        ├─ High confidence (≥75%) → Return (~5-10s)
+        └─ Low confidence ↓
+            ↓
+[6/5] LLM + Google Search (fallback)
+    └─ Web search grounding for deep analysis (~15-30s)
+        ↓
+   Cache result + return
+
+
+─────────────────────────────────────────────────────────────
+USAGE
+─────────────────────────────────────────────────────────────
+
+# First run — full pipeline
 python src/main.py test_image_gemini.png
 
-# İkinci çalıştırma — cache hit (çok hızlı olmalı)
+# Second run — cache hit (very fast)
 python src/main.py test_image_gemini.png
 
-# Cache'i atla, tekrar analiz et
+# Skip cache, re-analyze
 python src/main.py test_image_gemini.png --no-cache
------------------------------------------
+
+# Test forensic analyzer separately (debug/calibration)
+python src/test_forensic.py test_image_gemini.png
+
+
+─────────────────────────────────────────────────────────────
+SETUP
+─────────────────────────────────────────────────────────────
+
+# 1. Create virtual environment
+python -m venv venv
+venv\Scripts\activate          # Windows
+source venv/bin/activate       # Linux/Mac
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Create .env file
+echo GEMINI_API_KEY=your_key_here > .env
+
+# 4. Run
+python src/main.py path/to/image.jpg
+
+
+─────────────────────────────────────────────────────────────
+DEPENDENCIES
+─────────────────────────────────────────────────────────────
+
+google-generativeai>=0.8.0    # Gemini API
+python-dotenv>=1.0.0          # Environment variables
+Pillow>=10.0.0                # Image processing
+imagehash>=4.3.1              # Perceptual hashing
+numpy>=1.24.0                 # Numerical operations
+opencv-python>=4.8.0          # Edge detection (Canny)
+scipy>=1.11.0                 # Signal processing
+
+
+─────────────────────────────────────────────────────────────
+GITIGNORE TARGETS
+─────────────────────────────────────────────────────────────
+
+.env                  # API key
+venv/                 # Virtual environment
+__pycache__/          # Python cache
+data/cache.db         # SQLite database
+forensic_output/      # Test forensic images
+*.log                 # Log files
+
+
+
