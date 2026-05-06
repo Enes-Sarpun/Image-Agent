@@ -8,7 +8,6 @@ Kullanım:
 
 import sys
 from pathlib import Path
-
 from agent import ImageAgent
 from result import AnalysisResult
 

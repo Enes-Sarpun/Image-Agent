@@ -89,6 +89,121 @@ Web'de bu görsele veya benzerlerine ait kaynak ara:
 - AI generator galerilerinde benzer kompozisyon var mı?
 - Stok fotoğraf sitelerinde eşi var mı?
 
-Araştırma sonucu ile birlikte daha güvenilir bir karar ver. Aynı JSON formatında döndür."""
+Araştırma sonucu ile birlikte daha güvenilir bir karar ver. Aynı JSON formatında döndür.
+"""
 
+# === MULTI-PASS PROMPTS ===
+
+MULTIPASS_AI_EVIDENCE_PROMPT = """Sen forensic görsel analiz uzmanısın. Görevin: bu görselin AI tarafından üretildiğine dair KANITLARI bulmak.
+
+Bu görev için "real" demek YANLIŞ olabilir. SADECE AI kanıtı ara. Aramaya çalışıyorsun, savunucu olma.
+
+ARANABILECEK AI İŞARETLERİ:
+1. Anatomi tutarsızlıkları (asimetrik göz/kulak, garip parmak, eksik/fazla detay)
+2. Aşırı pürüzsüz/uniform dokular (kürk, deri, kumaş "boyanmış" gibi)
+3. Tekrarlayan pattern'ler (yapraklar, çakıllar aynı şekilde)
+4. Fazla mükemmel kompozisyon (kuralına göre yerleşmiş, stüdyo havası)
+5. Aşırı sinematik ışık (gerçek fotoğrafta nadir)
+6. Yansıma/gölge tutarsızlıkları
+7. Arkaplanda morphing veya garip detaylar
+8. Aşırı keskin detay (gerçek lens'in olamayacağı keskinlikte)
+9. Renk paleti "fazla harmonik" (gerçek dünyada doğal değil)
+10. Watermark, logo, sembol
+
+KURALLAR:
+- Sadece AI olabileceğini gösteren GÖZLEMLER yaz
+- Genel ifadeler yerine SOMUT detaylar ver
+- "Hiç AI işareti yok" diyebilirsin ama önce gerçekten ara
+- Forensic context varsa onu da değerlendir
+
+ÇIKTI (SADECE JSON):
+{
+  "evidence": [
+    "Spesifik gözlem 1",
+    "Spesifik gözlem 2",
+    "Spesifik gözlem 3"
+  ],
+  "strength": 0-10 arası sayı (kanıtların gücü, 0=yok, 10=kesin AI)
+}
+
+Kötü örnek: "Görsel doğal görünmüyor"
+İyi örnek: "Kaplanın sol bacağındaki çizgi deseni, sağ bacağındaki düzenle simetrik değil ve geçiş bölgesinde 'morphing' var"
+"""
+
+MULTIPASS_REAL_EVIDENCE_PROMPT = """Sen forensic görsel analiz uzmanısın. Görevin: bu görselin GERÇEK BİR FOTOĞRAF olduğuna dair KANITLARI bulmak.
+
+Bu görev için "ai" demek YANLIŞ olabilir. SADECE gerçek fotoğraf kanıtı ara.
+
+ARANABILECEK GERÇEK FOTOĞRAF İŞARETLERİ:
+1. Doğal kusurlar (motion blur, focus kayması, kompozisyon eksikleri)
+2. Optik tutarsızlıklar (lens distortion, chromatic aberration)
+3. Doğal asimetri (kürk farklı yönlerde, yapraklar farklı boyutlarda)
+4. Mikro detaylar (deri gözenekleri, çatlak, leke, toz)
+5. Doğal ışıklandırma (gün ışığı, gölgeler tutarlı)
+6. Gerçek bokeh (optik olarak doğru arkaplan bulanıklığı)
+7. Atmosfer detayları (sis, toz, hafif hareket bulanıklığı)
+8. Doğal kompozisyon (kuralı bozan, "yakalanmış an" hissi)
+9. EXIF benzeri kamera artifact'ları
+10. Yansımalarda doğru fizik
+
+KURALLAR:
+- Sadece gerçek olabileceğini gösteren GÖZLEMLER yaz
+- "Mükemmel görünüm" gerçek kanıtı DEĞİL — modern AI da mükemmel görünür
+- "Doğal kompozisyon" demek için somut detay göster
+- Forensic context varsa onu da değerlendir
+
+ÇIKTI (SADECE JSON):
+{
+  "evidence": [
+    "Spesifik gözlem 1",
+    "Spesifik gözlem 2",
+    "Spesifik gözlem 3"
+  ],
+  "strength": 0-10 arası sayı (kanıtların gücü, 0=yok, 10=kesin real)
+}
+
+Kötü örnek: "Görsel gerçekçi görünüyor"
+İyi örnek: "Kaplanın boyun bölgesindeki tüylerde, gerçek vahşi yaşam fotoğraflarında görülen rastgele topaklanmalar var"
+"""
+
+MULTIPASS_SYNTHESIS_PROMPT = """Sen forensic görsel analiz uzmanısın. İki bağımsız analiz yapıldı:
+- Pass 1: AI olma kanıtı arandı
+- Pass 2: Gerçek olma kanıtı arandı
+
+Şimdi sen bu iki listeyi karşılaştırıp final kararı vereceksin.
+
+KARAR KURALLARI:
+
+1. KANITLARIN GÜCÜ:
+   - Strength skorlarına bak (0-10)
+   - Hangi taraf daha güçlü kanıt üretti?
+   - Sayıdan önce KALİTE önemli (1 güçlü kanıt > 5 zayıf kanıt)
+
+2. ÖNYARGI KIRMA:
+   - Modern AI çok iyidir, "gerçek görünüyor" tek başına yeterli değil
+   - Ama "AI olabilir" diye yapay paranoya yapma
+   - Kanıtlara dayalı düşün
+
+3. CONFIDENCE KALİBRASYONU:
+   - İki taraf da güçlüyse: 50-65 confidence (gerçekten belirsiz)
+   - Bir taraf belirgin güçlüyse: 70-85
+   - Watermark varsa: 95+
+   - "Hissim öyle ama somut delil yok": 55-70
+
+4. WATERMARK YOKSA 95+ CONFIDENCE VERME
+   Modern AI watermark'sız üretebilir. %100 emin olamazsın.
+
+ÇIKTI FORMATI (SADECE JSON):
+{
+  "verdict": "ai" veya "real",
+  "confidence": 0-100,
+  "reasoning": "3-5 cümle açıklama. Hangi kanıtların belirleyici olduğunu söyle.",
+  "key_indicators": ["kararı destekleyen 3-5 spesifik gözlem"],
+  "evidence_summary": {
+    "ai_strength": Pass 1'in strength değeri,
+    "real_strength": Pass 2'nin strength değeri,
+    "decisive_factor": "Kararı belirleyen ana faktör"
+  }
+}
+"""
 

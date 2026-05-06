@@ -1,6 +1,6 @@
 """
 Image Agent: Ana orkestratör.
-Forensic preprocessing + LLM + Web Search.
+Cache → Watermark → Forensic → LLM → Multi-Pass → Web Search
 """
 
 import time
@@ -18,6 +18,7 @@ from tools.exif_reader import read_exif, is_likely_real_camera
 from tools.watermark_detector import detect_gemini_sparkle
 from tools.forensic_analyzer import ForensicAnalyzer
 from tools.llm_vision import LLMVisionTool
+from tools.multi_pass_analyzer import MultiPassAnalyzer
 from tools.llm_with_search import LLMWithSearchTool
 
 from cache.sqlite_cache import SQLiteCache
@@ -29,16 +30,18 @@ class ImageAgent:
 
     Akış:
     1. Cache check
-    2. Hızlı kontroller (EXIF, watermark)
-    3. Forensic preprocessing (edge analizi)
+    2. EXIF + Watermark
+    3. Forensic preprocessing
     4. LLM vision (forensic context ile)
-    5. Confidence düşükse → web search
+    5. Düşük confidence → Multi-pass reasoning
+    6. Hâlâ düşük → Web search
     """
 
     def __init__(self):
         self.cache = SQLiteCache()
         self.forensic = ForensicAnalyzer()
         self.llm_vision = LLMVisionTool()
+        self.multi_pass = MultiPassAnalyzer()
         self.llm_search = LLMWithSearchTool()
 
     def analyze(self, image_path: Union[str, Path], use_cache: bool = True) -> AnalysisResult:
@@ -52,7 +55,7 @@ class ImageAgent:
         # ─────────────────────────────────────
         # KATMAN 1: Cache check
         # ─────────────────────────────────────
-        print("  [1/5] Computing image hash...")
+        print("  [1/6] Computing image hash...")
         image_hash = compute_hash(image_path)
 
         if use_cache:
@@ -63,13 +66,12 @@ class ImageAgent:
                 return cached
 
         # ─────────────────────────────────────
-        # KATMAN 2: Hızlı kontroller
+        # KATMAN 2: EXIF + Watermark
         # ─────────────────────────────────────
-        print("  [2/5] EXIF + watermark check...")
+        print("  [2/6] EXIF + watermark check...")
         exif = read_exif(image_path)
         watermark = detect_gemini_sparkle(image_path)
 
-        # Watermark varsa direkt karar
         if watermark["found"] and watermark["confidence"] >= WATERMARK_CONFIDENCE_THRESHOLD:
             result = AnalysisResult(
                 verdict="ai",
@@ -88,7 +90,7 @@ class ImageAgent:
         # ─────────────────────────────────────
         # KATMAN 3: Forensic preprocessing
         # ─────────────────────────────────────
-        print("  [3/5] Forensic edge analysis...")
+        print("  [3/6] Forensic edge analysis...")
         try:
             forensic_result = self.forensic.analyze_all(image_path)
             ai_score = forensic_result["ai_likelihood"]["ai_score"]
@@ -97,10 +99,22 @@ class ImageAgent:
             print(f"      ⚠ Forensic failed: {e}")
             forensic_result = None
 
+        # EXIF ipuçlarını topla
+        extra_indicators = []
+        if is_likely_real_camera(exif):
+            extra_indicators.append(
+                f"EXIF: real camera detected ({exif['camera_make']} {exif['camera_model']})"
+            )
+        if not exif["has_exif"]:
+            extra_indicators.append("EXIF: no metadata (common in AI images)")
+        if forensic_result:
+            for signal in forensic_result["ai_likelihood"]["signals"]:
+                extra_indicators.append(f"Forensic: {signal}")
+
         # ─────────────────────────────────────
-        # KATMAN 4: LLM Analysis (forensic context ile)
+        # KATMAN 4: LLM Vision (tek pass)
         # ─────────────────────────────────────
-        print("  [4/5] LLM vision analysis (with forensic context)...")
+        print("  [4/6] LLM vision analysis...")
         try:
             llm_result = self.llm_vision.analyze(
                 image_path,
@@ -108,21 +122,6 @@ class ImageAgent:
             )
         except Exception as e:
             raise RuntimeError(f"LLM vision failed: {e}")
-
-        # EXIF ve forensic ipuçlarını sonuca ekle
-        extra_indicators = []
-        
-        if is_likely_real_camera(exif):
-            extra_indicators.append(
-                f"EXIF: real camera detected ({exif['camera_make']} {exif['camera_model']})"
-            )
-        if not exif["has_exif"]:
-            extra_indicators.append("EXIF: no metadata (common in AI images)")
-
-        if forensic_result:
-            forensic_signals = forensic_result["ai_likelihood"]["signals"]
-            for signal in forensic_signals:
-                extra_indicators.append(f"Forensic: {signal}")
 
         result = AnalysisResult(
             verdict=llm_result["verdict"],
@@ -133,16 +132,52 @@ class ImageAgent:
             raw_response=llm_result.get("raw_response", "")
         )
 
-        # Yeterince güveniyorsa cache'le ve dön
+        # Yüksek confidence varsa direkt dön
         if result.confidence >= LLM_CONFIDENCE_THRESHOLD:
             result.elapsed_ms = (time.perf_counter() - start_time) * 1000
             self.cache.set(image_hash, result)
             return result
 
         # ─────────────────────────────────────
-        # KATMAN 5: Web Search (fallback)
+        # KATMAN 5: Multi-Pass Reasoning (düşük confidence)
         # ─────────────────────────────────────
-        print("  [5/5] Low confidence, running web search...")
+        print("  [5/6] Low confidence — running multi-pass analysis...")
+        try:
+            mp_result = self.multi_pass.analyze(
+                image_path,
+                forensic_result=forensic_result
+            )
+
+            # Multi-pass kanıtlarını indicators'a ekle
+            mp_indicators = list(mp_result.get("key_indicators", []))
+            if mp_result.get("ai_evidence"):
+                for ev in mp_result["ai_evidence"][:3]:
+                    mp_indicators.append(f"AI evidence: {ev}")
+            if mp_result.get("real_evidence"):
+                for ev in mp_result["real_evidence"][:3]:
+                    mp_indicators.append(f"Real evidence: {ev}")
+
+            result = AnalysisResult(
+                verdict=mp_result["verdict"],
+                confidence=float(mp_result["confidence"]),
+                reasoning=mp_result["reasoning"],
+                key_indicators=mp_indicators + extra_indicators,
+                source="multi_pass+forensic",
+                raw_response=mp_result.get("raw_response", "")
+            )
+        except Exception as e:
+            print(f"      ⚠ Multi-pass failed, keeping LLM result: {e}")
+
+        # Multi-pass yeterince güveniyorsa dön
+        if result.confidence >= LLM_CONFIDENCE_THRESHOLD:
+            result.elapsed_ms = (time.perf_counter() - start_time) * 1000
+            self.cache.set(image_hash, result)
+            return result
+
+        # ─────────────────────────────────────
+        # KATMAN 6: Web Search (son çare)
+        # ─────────────────────────────────────
+        print("  [6/6] Still low confidence — running web search...")
         try:
             search_result = self.llm_search.analyze(image_path)
             result = AnalysisResult(
@@ -154,8 +189,8 @@ class ImageAgent:
                 raw_response=search_result.get("raw_response", "")
             )
         except Exception as e:
-            print(f"  ⚠ Web search failed, keeping LLM result: {e}")
-            result.source = "llm+forensic (search_failed)"
+            print(f"  ⚠ Web search failed: {e}")
+            result.source = result.source + " (search_failed)"
 
         result.elapsed_ms = (time.perf_counter() - start_time) * 1000
         self.cache.set(image_hash, result)
