@@ -11,6 +11,7 @@ from config import (
     WATERMARK_CONFIDENCE_THRESHOLD,
     LLM_CONFIDENCE_THRESHOLD,
 )
+from tools.confidence_calibrator import calibrate as calibrate_confidence
 from result import AnalysisResult
 
 from tools.image_hasher import compute_hash
@@ -83,6 +84,8 @@ class ImageAgent:
                 ],
                 source="watermark"
             )
+            # Watermark path'inde calibration — watermark bulunduğunu geçiriyoruz
+            result = self._apply_calibration(result, exif, forensic_result=None, watermark_found=True)
             result.elapsed_ms = (time.perf_counter() - start_time) * 1000
             self.cache.set(image_hash, result)
             return result
@@ -134,6 +137,7 @@ class ImageAgent:
 
         # Yüksek confidence varsa direkt dön
         if result.confidence >= LLM_CONFIDENCE_THRESHOLD:
+            result = self._apply_calibration(result, exif, forensic_result, watermark_found=False)
             result.elapsed_ms = (time.perf_counter() - start_time) * 1000
             self.cache.set(image_hash, result)
             return result
@@ -170,6 +174,7 @@ class ImageAgent:
 
         # Multi-pass yeterince güveniyorsa dön
         if result.confidence >= LLM_CONFIDENCE_THRESHOLD:
+            result = self._apply_calibration(result, exif, forensic_result, watermark_found=False)
             result.elapsed_ms = (time.perf_counter() - start_time) * 1000
             self.cache.set(image_hash, result)
             return result
@@ -192,9 +197,39 @@ class ImageAgent:
             print(f"  ⚠ Web search failed: {e}")
             result.source = result.source + " (search_failed)"
 
+        # Son adım: her koşulda calibration uygula
+        result = self._apply_calibration(result, exif, forensic_result, watermark_found=False)
         result.elapsed_ms = (time.perf_counter() - start_time) * 1000
         self.cache.set(image_hash, result)
         return result
-    
 
-    
+    def _apply_calibration(
+        self,
+        result: AnalysisResult,
+        exif: dict,
+        forensic_result,
+        watermark_found: bool,
+    ) -> AnalysisResult:
+        """
+        Confidence Calibrator'ı çalıştır ve sonucu result'a yaz.
+        Adjustment log'u key_indicators'a ekler.
+        """
+        cal = calibrate_confidence(
+            verdict=result.verdict,
+            raw_confidence=result.confidence,
+            exif=exif,
+            forensic_result=forensic_result,
+            watermark_found=watermark_found,
+        )
+
+        if cal["adjustment_log"]:
+            delta_str = f"+{cal['delta']}" if cal["delta"] >= 0 else str(cal["delta"])
+            print(f"      Calibration: {cal['raw_confidence']:.1f} → {cal['calibrated_confidence']:.1f} ({delta_str})")
+            for entry in cal["adjustment_log"]:
+                print(f"        {entry}")
+            result.key_indicators.append(
+                f"Calibration: raw={cal['raw_confidence']:.1f}% → calibrated={cal['calibrated_confidence']:.1f}% (delta={delta_str})"
+            )
+
+        result.confidence = cal["calibrated_confidence"]
+        return result
