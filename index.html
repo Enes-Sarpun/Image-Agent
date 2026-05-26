@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image Agent — AI Görsel Tespiti</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- SVG Icons (inline defs) -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <defs>
+      <!-- upload-cloud -->
+      <symbol id="icon-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 16 12 12 8 16"/>
+        <line x1="12" y1="12" x2="12" y2="21"/>
+        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+      </symbol>
+      <!-- search -->
+      <symbol id="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </symbol>
+      <!-- image -->
+      <symbol id="icon-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </symbol>
+      <!-- x -->
+      <symbol id="icon-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/>
+        <line x1="6" y1="6" x2="18" y2="18"/>
+      </symbol>
+      <!-- check -->
+      <symbol id="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </symbol>
+      <!-- arrow-down -->
+      <symbol id="icon-arrow-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <polyline points="19 12 12 19 5 12"/>
+      </symbol>
+      <!-- arrow-right -->
+      <symbol id="icon-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="5" y1="12" x2="19" y2="12"/>
+        <polyline points="12 5 19 12 12 19"/>
+      </symbol>
+      <!-- chevron-down -->
+      <symbol id="icon-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </symbol>
+      <!-- github -->
+      <symbol id="icon-github" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+      </symbol>
+      <!-- mail -->
+      <symbol id="icon-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+        <polyline points="22,6 12,13 2,6"/>
+      </symbol>
+      <!-- clock -->
+      <symbol id="icon-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </symbol>
+      <!-- alert-triangle -->
+      <symbol id="icon-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </symbol>
+      <!-- camera -->
+      <symbol id="icon-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </symbol>
+      <!-- help-circle -->
+      <symbol id="icon-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </symbol>
+    </defs>
+  </svg>
+</head>
+
+<body>
+
+  <!-- Global mist canvas — fixed, behind everything -->
+  <canvas id="mistCanvas" aria-hidden="true"></canvas>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ════════════════════════════════
+       TOP NAV
+  ════════════════════════════════ -->
+  <nav id="nav">
+    <a href="#hero" class="nav-brand">
+      <span class="nav-emoji">🙂</span>
+      <span class="nav-wordmark">ImageAgent</span>
+    </a>
+    <div class="nav-links">
+      <a href="#app" class="nav-link">Uygulama</a>
+      <a href="#pipeline" class="nav-link">Nasıl Çalışır</a>
+      <a href="https://github.com/Enes-Sarpun/Image-Agent" target="_blank" rel="noopener" class="nav-link">
+        <svg width="14" height="14"><use href="#icon-github"/></svg>
+        GitHub
+      </a>
+    </div>
+  </nav>
+
+  <!-- ════════════════════════════════
+       HERO
+  ════════════════════════════════ -->
+  <section id="hero">
+    <div class="hero-inner" id="heroInner">
+      <p class="hero-label">AI Görsel Tespiti</p>
+      <h1 class="hero-title">Image Agent</h1>
+      <p class="hero-tagline">
+        Bir görsel <em>yapay zeka tarafından mı</em> üretildi?<br>
+        Çok katmanlı forensic analiz ile saniyeler içinde öğren.
+      </p>
+      <a href="#app" class="hero-cta">
+        Uygulamayı Dene
+        <svg width="16" height="16"><use href="#icon-arrow-right"/></svg>
+      </a>
+    </div>
+    <a href="#app" class="scroll-cue" aria-label="Aşağı kaydır">
+      <div class="scroll-cue-line"></div>
+      <div class="scroll-cue-dot"></div>
+    </a>
+  </section>
+
+  <!-- ════════════════════════════════
+       APP SECTION
+  ════════════════════════════════ -->
+  <section id="app">
+    <div class="app-header reveal">
+      <p class="section-eyebrow">Analiz</p>
+      <h2 class="section-heading">Görseli yükle, sonucu gör</h2>
+    </div>
+
+    <div class="app-grid">
+
+      <!-- Sol: Dropzone -->
+      <div>
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/gif" />
+          <svg class="dropzone-icon" width="40" height="40"><use href="#icon-upload"/></svg>
+          <span class="dropzone-title">Görseli sürükleyin veya tıklayın</span>
+          <span class="dropzone-hint">JPG · PNG · WEBP · max 20MB</span>
+          <img class="preview-img" id="previewImg" alt="Yüklenen görsel" />
+          <button class="preview-clear" id="previewClear" type="button" aria-label="Görseli kaldır">
+            <svg width="12" height="12"><use href="#icon-x"/></svg>
+          </button>
+          <div class="preview-meta" id="previewMeta"></div>
+        </div>
+
+        <div class="app-controls">
+          <label class="checkbox-wrap" id="cacheLabel">
+            <div class="checkbox-box checked" id="cacheBox">
+              <svg width="10" height="10"><use href="#icon-check"/></svg>
+            </div>
+            <span class="checkbox-label">Cache kullan — aynı görsel tekrar analiz edilmez</span>
+          </label>
+
+          <button class="btn-analyze" id="analyzeBtn" disabled>
+            <div class="spinner"></div>
+            <svg class="btn-icon" width="16" height="16"><use href="#icon-search"/></svg>
+            <span class="btn-text">Analiz Et</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sağ: Sonuç -->
+      <div class="result-panel">
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState">
+          <svg class="empty-state-icon" width="48" height="48"><use href="#icon-image"/></svg>
+          <span class="empty-state-title">Henüz analiz yok</span>
+          <span class="empty-state-hint">Bir görsel yükleyin,<br>sonuç burada görünecek.</span>
+        </div>
+
+        <!-- Skeleton -->
+        <div class="skeleton-card" id="skeletonCard">
+          <div class="skeleton-line tall"></div>
+          <div class="skeleton-line wide"></div>
+          <div class="skeleton-line short" style="margin-bottom:32px;"></div>
+          <div class="skeleton-line wide"></div>
+          <div class="skeleton-line med"></div>
+          <div class="skeleton-line wide"></div>
+        </div>
+
+        <!-- Verdict Card -->
+        <div class="verdict-card" id="verdictCard">
+          <div class="verdict-top">
+            <div class="verdict-label" id="verdictLabel"></div>
+            <div class="verdict-confidence" id="verdictConfidence">%0</div>
+          </div>
+          <div class="verdict-bar-wrap">
+            <div class="verdict-bar-fill" id="verdictBar"></div>
+          </div>
+          <div class="verdict-meta" id="verdictMeta"></div>
+          <div class="verdict-reasoning">
+            <div class="verdict-reasoning-label">Gerekçe</div>
+            <div class="verdict-reasoning-text" id="verdictReasoning"></div>
+          </div>
+          <div class="verdict-indicators" id="verdictIndicators"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Forensic Accordion (sonuç gelince görünür) -->
+    <div class="forensic-accordion" id="forensicAccordion">
+      <div class="accordion-summary" id="accordionSummary">
+        <span>Forensic Detaylar</span>
+        <svg class="accordion-chevron" width="16" height="16"><use href="#icon-chevron-down"/></svg>
+      </div>
+      <div class="accordion-body">
+        <div class="forensic-placeholder">
+          ELA · FFT · Edge Density görselleri yakında —<br>
+          <span style="color:var(--text-disabled)">REST API güncellemesiyle eklenecek.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════
+       STATEMENT
+  ════════════════════════════════ -->
+  <section id="statement">
+    <div class="statement-inner">
+      <p class="statement-text" id="statementText" aria-live="polite">
+        <span class="statement-typed"></span><span class="typewriter-cursor"></span>
+      </p>
+      <!-- Raw text kept for JS to read -->
+      <template id="statementRaw">Midjourney, Stable Diffusion ve Flux gibi modeller\nartık insan gözünü kolayca yanıltıyor.\n\nImage Agent, buna çok katmanlı bir yanıt sunuyor.</template>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════
+       PIPELINE
+  ════════════════════════════════ -->
+  <section id="pipeline">
+    <div class="pipeline-inner">
+      <div class="pipeline-header">
+        <p class="section-eyebrow reveal">Nasıl Çalışır?</p>
+        <h2 class="section-heading reveal reveal-delay">7 katmanlı<br>analiz pipeline'ı.</h2>
+      </div>
+
+      <div class="steps">
+        <div class="step reveal">
+          <div class="step-index-wrap">
+            <span class="step-index">01</span>
+          </div>
+          <div class="step-right">
+            <span class="step-label">Cache Kontrolü</span>
+            <span class="step-desc">Perceptual hash ile aynı görsel daha önce analiz edilmişse ~100ms'de sonuç döner.</span>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="step-index-wrap">
+            <span class="step-index">02</span>
+          </div>
+          <div class="step-right">
+            <span class="step-label">EXIF + Watermark</span>
+            <span class="step-desc">Kamera EXIF verisi okunur. Gemini sparkle watermark'ı piksel analizi ile tespit edilir.</span>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="step-index-wrap">
+            <span class="step-index">03</span>
+          </div>
+          <div class="step-right">
+            <span class="step-label">Forensic Analiz</span>
+            <span class="step-desc">ELA, FFT frekans haritası ve edge pattern yoğunluğu hesaplanır.</span>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="step-index-wrap">
+            <span class="step-index">04</span>
+          </div>
+          <div class="step-right">
+            <span class="step-label">LLM Vision</span>
+            <span class="step-desc">Gemini 2.5 Flash, forensic context ile beslenerek görseli yorumlar ve karar üretir.</span>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="step-index-wrap">
+            <span class="step-index">05</span>
+          </div>
+          <div class="step-right">
+            <span class="step-label">Multi-Pass Reasoning</span>
+            <span class="step-desc">Düşük confidence'da 3 aşamalı çapraz sorgulama: AI kanıtı — Gerçek kanıtı — Sentez.</span>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="step-index-wrap">
+            <span class="step-index">06</span>
+          </div>
+          <div class="step-right">
+            <span class="step-label">Web Search Fallback</span>
+            <span class="step-desc">Hâlâ belirsizse Google Search grounding devreye girer, web bağlamıyla karar güçlenir.</span>
+          </div>
+        </div>
+        <div class="step reveal">
+          <div class="step-index-wrap">
+            <span class="step-index">07</span>
+          </div>
+          <div class="step-right">
+            <span class="step-label">Confidence Calibration</span>
+            <span class="step-desc">Ham LLM skoru 5 kuralla kalibre edilir: watermark, forensic çelişkisi, EXIF ve consensus boost.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════
+       FEATURES
+  ════════════════════════════════ -->
+  <section id="features">
+    <div class="features-inner">
+      <div class="features-header">
+        <div>
+          <p class="section-eyebrow reveal">Özellikler</p>
+          <h2 class="section-heading reveal reveal-delay">Neler yapabiliyor?</h2>
+        </div>
+        <p class="features-desc reveal reveal-delay2">
+          Her görsel, nihai karardan önce yedi farklı analiz aşamasından geçer.
+        </p>
+      </div>
+
+      <div class="feature-list">
+        <div class="feature-item reveal">
+          <span class="feature-num">01</span>
+          <div>
+            <p class="feature-name">Forensic Analiz</p>
+            <p class="feature-desc">ELA, FFT frekans haritası ve edge yoğunluk hesaplamaları ile piksel düzeyinde inceleme.</p>
+          </div>
+        </div>
+        <div class="feature-item reveal reveal-delay">
+          <span class="feature-num">02</span>
+          <div>
+            <p class="feature-name">Gemini 2.5 Flash</p>
+            <p class="feature-desc">Google'ın en hızlı multimodal modeli. Web grounding ve görsel yorumlama desteğiyle.</p>
+          </div>
+        </div>
+        <div class="feature-item reveal">
+          <span class="feature-num">03</span>
+          <div>
+            <p class="feature-name">Multi-Pass Reasoning</p>
+            <p class="feature-desc">Düşük güven durumunda 3 aşamalı çapraz sorgulama. AI kanıtı, gerçek kanıtı, sentez.</p>
+          </div>
+        </div>
+        <div class="feature-item reveal reveal-delay">
+          <span class="feature-num">04</span>
+          <div>
+            <p class="feature-name">Akıllı Cache</p>
+            <p class="feature-desc">Perceptual hash ile aynı görsel ~100ms'de yanıtlanır. diskcache ile process-safe yapı.</p>
+          </div>
+        </div>
+        <div class="feature-item reveal">
+          <span class="feature-num">05</span>
+          <div>
+            <p class="feature-name">FastAPI Backend</p>
+            <p class="feature-desc">REST API ile her uygulamaya entegre edilebilir. Docker ile tek komutta çalıştırılabilir.</p>
+          </div>
+        </div>
+        <div class="feature-item reveal reveal-delay">
+          <span class="feature-num">06</span>
+          <div>
+            <p class="feature-name">Açık Kaynak</p>
+            <p class="feature-desc">MIT lisanslı. Fork et, katkıda bulun veya kendi projelerinde özgürce kullan.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════
+       FOOTER
+  ════════════════════════════════ -->
+  <footer>
+    <span class="footer-copy">© 2026 Image Agent · Enes Sarpün · MIT</span>
+    <div class="footer-links">
+      <a href="https://github.com/Enes-Sarpun/Image-Agent" target="_blank" rel="noopener" class="footer-link">
+        <svg width="13" height="13"><use href="#icon-github"/></svg>
+        GitHub
+      </a>
+      <a href="mailto:kingmazlum4321@gmail.com" class="footer-link">
+        <svg width="13" height="13"><use href="#icon-mail"/></svg>
+        İletişim
+      </a>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

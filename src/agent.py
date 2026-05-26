@@ -22,7 +22,7 @@ from tools.llm_vision import LLMVisionTool
 from tools.multi_pass_analyzer import MultiPassAnalyzer
 from tools.llm_with_search import LLMWithSearchTool
 
-from cache.sqlite_cache import SQLiteCache
+from cache.disk_cache import DiskCache
 
 
 class ImageAgent:
@@ -39,7 +39,7 @@ class ImageAgent:
     """
 
     def __init__(self):
-        self.cache = SQLiteCache()
+        self.cache = DiskCache()
         self.forensic = ForensicAnalyzer()
         self.llm_vision = LLMVisionTool()
         self.multi_pass = MultiPassAnalyzer()

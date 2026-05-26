@@ -170,6 +170,9 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
+# Image Agent runtime data (diskcache, SQLite)
+data/
+
 # PyPI configuration file
 .pypirc
 

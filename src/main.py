@@ -16,8 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from agent import ImageAgent
 from result import AnalysisResult
-
-SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+from config import SUPPORTED_FORMATS
 
 
 def print_banner():
@@ -73,12 +72,12 @@ def run_batch(folder_path: Path, use_cache: bool):
     """Klasördeki tüm desteklenen görselleri analiz eder."""
     images = sorted([
         p for p in folder_path.iterdir()
-        if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
+        if p.is_file() and p.suffix.lower() in set(SUPPORTED_FORMATS.keys())
     ])
 
     if not images:
         print(f"\n  ❌ Hata: '{folder_path}' klasöründe desteklenen görsel bulunamadı.\n")
-        print(f"     Desteklenen formatlar: {', '.join(SUPPORTED_EXTENSIONS)}\n")
+        print(f"     Desteklenen formatlar: {', '.join(set(SUPPORTED_FORMATS.keys()))}\n")
         sys.exit(1)
 
     print(f"\n  📂 Klasör: {folder_path}")
