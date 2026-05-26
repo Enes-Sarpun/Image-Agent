@@ -117,4 +117,4 @@ def analyze(image: UploadFile = File(...), use_cache: bool = Form(True)):
 
 
 # Static files — mount AFTER all API routes
-app.mount("/", StaticFiles(directory=str(PROJECT_ROOT), html=True), name="static")
+app.mount("/", StaticFiles(directory=str(PROJECT_ROOT / "frontend"), html=True), name="static")
