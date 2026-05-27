@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCheckbox();
   initReveal();
   initParallax();
+  initNeuralCanvas();
   initMistCanvas();
   initTypewriter();
 });
@@ -412,6 +413,276 @@ function initParallax() {
 }
 
 /* ════════════════════════════════════════════════════════════
+   NEURAL CANVAS  v2
+   ─────────────────────────────────────────────────────────
+   Architecture
+   ┌─ Spatial grid  O(n) neighbour search instead of O(n²)
+   ├─ Spring-damper physics  (home → scatter → snap)
+   ├─ Scroll velocity  → dynamic connectDist + hue shift
+   └─ Single rAF loop, no GC pressure inside hot path
+════════════════════════════════════════════════════════════ */
+function initNeuralCanvas() {
+  const canvas = document.getElementById('neuralCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d', { alpha: true });
+
+  /* ── viewport ── */
+  let W = 0, H = 0;
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    buildGrid();
+  }
+
+  /* ── scroll state ── */
+  let rawScroll    = 0;   // window.scrollY in px
+  let scrollVel    = 0;   // px/frame  (used for dynamic effects)
+  let lastScroll   = 0;
+  window.addEventListener('scroll', () => {
+    rawScroll = window.scrollY;
+  }, { passive: true });
+
+  /* ── mouse ── */
+  const mouse = { x: -9999, y: -9999, active: false };
+  window.addEventListener('mousemove', e => {
+    mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+  }, { passive: true });
+  window.addEventListener('mouseleave', () => { mouse.active = false; });
+
+  /* ════════════════ CONSTANTS ════════════════ */
+  const N              = 220;     // node count
+  const BASE_DIST      = 185;     // base connection threshold (px)
+  const MAX_DIST_BONUS = 80;      // extra reach when scrolling fast
+  const SCATTER_R      = 140;     // mouse repulsion radius (px)
+  const SPRING_K       = 0.022;   // spring stiffness — softer, nodes wander more
+  const DAMPING        = 0.88;    // higher damping = smoother movement
+  const REPULSE_STR    = 26;      // scatter force multiplier
+  const DRIFT_SPD      = 0.45;    // faster drift = better bottom coverage
+  const PAGE_ROWS      = 1.0;     // virtual = viewport; nodes always fill the screen
+
+  /* ════════════════ PALETTE ════════════════ */
+  // Each node picks from this; edges blend between node colours
+  const PAL = [
+    [15,  20,  50 ],  // deep navy
+    [22,  18,  80 ],  // dark indigo
+    [55,  20,  130],  // violet shadow
+    [90,  35,  200],  // vivid indigo
+    [109, 40,  217],  // neon violet
+    [139, 92,  246],  // accent #8B5CF6
+    [167, 139, 250],  // lavender
+    [200, 170, 255],  // pale violet (rare)
+  ];
+
+  /* ════════════════ NODE POOL ════════════════ */
+  // Flat arrays — avoid object allocation in hot path
+  const hx    = new Float32Array(N);   // home X
+  const hy    = new Float32Array(N);   // home Y (virtual, 0..H*PAGE_ROWS)
+  const px    = new Float32Array(N);   // current X
+  const py    = new Float32Array(N);   // current Y
+  const vx    = new Float32Array(N);   // velocity X
+  const vy    = new Float32Array(N);   // velocity Y
+  const ddx   = new Float32Array(N);   // drift delta X
+  const ddy   = new Float32Array(N);   // drift delta Y
+  const rad   = new Float32Array(N);   // node radius
+  const alpha = new Float32Array(N);   // base alpha
+  const phase = new Float32Array(N);   // pulse phase
+  const colR  = new Uint8Array(N);
+  const colG  = new Uint8Array(N);
+  const colB  = new Uint8Array(N);
+
+  function initNodes() {
+    for (let i = 0; i < N; i++) {
+      const c = PAL[Math.floor(Math.random() * PAL.length)];
+      hx[i]    = Math.random() * W;
+      hy[i]    = (i / N) * H + Math.random() * (H / N);
+      px[i]    = hx[i];
+      py[i]    = hy[i];
+      vx[i]    = 0;
+      vy[i]    = 0;
+      vx[i]    = 0; vy[i] = 0;
+      ddx[i]   = (Math.random() - 0.5) * DRIFT_SPD;
+      ddy[i]   = (Math.random() - 0.5) * DRIFT_SPD * 0.6;
+      rad[i]   = 1.8 + Math.random() * 3.0;
+      alpha[i] = 0.55 + Math.random() * 0.45;
+      phase[i] = Math.random() * Math.PI * 2;
+      colR[i]  = c[0]; colG[i] = c[1]; colB[i] = c[2];
+    }
+  }
+
+  /* ════════════════ SPATIAL GRID ════════════════ */
+  // Divides viewport into cells; only check neighbours for edges
+  let CELL = 0, COLS = 0, ROWS_G = 0;
+  let grid;   // Array of arrays, rebuilt each frame (reuse refs)
+
+  function buildGrid() {
+    CELL   = BASE_DIST + MAX_DIST_BONUS;
+    COLS   = Math.ceil(W / CELL) + 1;
+    ROWS_G = Math.ceil(H / CELL) + 1;
+    grid   = Array.from({ length: COLS * ROWS_G }, () => []);
+  }
+
+  function clearGrid() {
+    if (!grid) return;
+    for (let i = 0; i < grid.length; i++) grid[i].length = 0;
+  }
+
+  function insertGrid(i) {
+    const cx = (px[i] / CELL) | 0;
+    const cy = (py[i] / CELL) | 0;
+    if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS_G) return;
+    grid[cy * COLS + cx].push(i);
+  }
+
+  /* ════════════════ DRAW HELPERS ════════════════ */
+  function drawNode(i, pulse) {
+    const x  = px[i], y = py[i];
+    const pr = Math.max(0.5, rad[i] * (1 + pulse * 0.35));
+    const a  = alpha[i] * (0.75 + pulse * 0.25);
+    const R  = colR[i], G = colG[i], B = colB[i];
+    const glowR = pr * 5;
+
+    // outer glow
+    const g = ctx.createRadialGradient(x, y, 0, x, y, glowR);
+    g.addColorStop(0,    `rgba(${R},${G},${B},${(a * 0.80).toFixed(3)})`);
+    g.addColorStop(0.30, `rgba(${R},${G},${B},${(a * 0.25).toFixed(3)})`);
+    g.addColorStop(1,    `rgba(${R},${G},${B},0)`);
+    ctx.beginPath();
+    ctx.arc(x, y, glowR, 0, 6.2832);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // solid core
+    ctx.beginPath();
+    ctx.arc(x, y, pr, 0, 6.2832);
+    ctx.fillStyle = `rgba(${R},${G},${B},${a.toFixed(3)})`;
+    ctx.fill();
+  }
+
+  function drawEdge(i, j, dist, connectDist, hueShift) {
+    const prox = 1 - dist / connectDist;
+    const ea   = prox * prox * (0.32 + hueShift * 0.22);
+
+    // interpolate node colours toward neon violet on close pairs
+    const t  = prox * 0.45 + hueShift * 0.25;
+    const iT = 1 - t;
+    const eR = ((colR[i] + colR[j]) * 0.5 * iT + 139 * t) | 0;
+    const eG = ((colG[i] + colG[j]) * 0.5 * iT + 92  * t) | 0;
+    const eB = ((colB[i] + colB[j]) * 0.5 * iT + 246 * t) | 0;
+
+    ctx.beginPath();
+    ctx.moveTo(px[i], py[i]);
+    ctx.lineTo(px[j], py[j]);
+    ctx.strokeStyle = `rgba(${eR},${eG},${eB},${ea.toFixed(3)})`;
+    ctx.lineWidth   = prox * 1.4;
+    ctx.stroke();
+  }
+
+  /* ════════════════ MAIN LOOP ════════════════ */
+  let t = 0;
+
+  function frame() {
+    requestAnimationFrame(frame);
+    t += 0.007;
+
+    /* scroll velocity (px/frame) — smoothed */
+    const rawVel = rawScroll - lastScroll;
+    scrollVel    = scrollVel * 0.85 + rawVel * 0.15;
+    lastScroll   = rawScroll;
+
+    /* dynamic connection distance — grows when scrolling fast */
+    const speedFactor = Math.min(Math.abs(scrollVel) / 12, 1);
+    const connectDist = BASE_DIST + speedFactor * MAX_DIST_BONUS;
+
+    /* hue shift: 0 at rest, 1 at fast scroll → edges glow brighter */
+    const hueShift = speedFactor;
+
+    /* ── update nodes ── */
+    clearGrid();
+    for (let i = 0; i < N; i++) {
+      /* drift home position — wraps within viewport */
+      hx[i] += ddx[i];
+      hy[i] += ddy[i];
+      if (hx[i] < -80) { hx[i] = W + 80; hy[i] = Math.random() * H; }
+      else if (hx[i] > W + 80) { hx[i] = -80; hy[i] = Math.random() * H; }
+      if (hy[i] < -80) { hy[i] = H + 80; hx[i] = Math.random() * W; }
+      else if (hy[i] > H + 80) { hy[i] = -80; hx[i] = Math.random() * W; }
+
+      /* target = home (viewport coords, no scroll offset) */
+      const tx = hx[i];
+      const ty = hy[i];
+
+      /* spring force toward target */
+      vx[i] += (tx - px[i]) * SPRING_K;
+      vy[i] += (ty - py[i]) * SPRING_K;
+
+      /* mouse scatter — smooth repulsion */
+      if (mouse.active) {
+        const dx = px[i] - mouse.x;
+        const dy = py[i] - mouse.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < SCATTER_R * SCATTER_R && d2 > 0.01) {
+          const d     = Math.sqrt(d2);
+          const force = (1 - d / SCATTER_R);
+          const f     = force * force * REPULSE_STR;  // quadratic falloff
+          vx[i] += (dx / d) * f;
+          vy[i] += (dy / d) * f;
+        }
+      }
+
+      /* damping + integrate */
+      vx[i] *= DAMPING;
+      vy[i] *= DAMPING;
+      px[i] += vx[i];
+      py[i] += vy[i];
+
+      /* insert into spatial grid (skip off-screen nodes) */
+      if (py[i] > -60 && py[i] < H + 60) insertGrid(i);
+    }
+
+    /* ── render ── */
+    ctx.clearRect(0, 0, W, H);
+
+    /* edges pass */
+    const distSq = connectDist * connectDist;
+    for (let i = 0; i < N; i++) {
+      if (py[i] < -60 || py[i] > H + 60) continue;
+      const cx = (px[i] / CELL) | 0;
+      const cy = (py[i] / CELL) | 0;
+
+      // check 3×3 neighbourhood in grid
+      for (let ny2 = cy - 1; ny2 <= cy + 1; ny2++) {
+        if (ny2 < 0 || ny2 >= ROWS_G) continue;
+        for (let nx2 = cx - 1; nx2 <= cx + 1; nx2++) {
+          if (nx2 < 0 || nx2 >= COLS) continue;
+          const cell = grid[ny2 * COLS + nx2];
+          for (let k = 0; k < cell.length; k++) {
+            const j = cell[k];
+            if (j <= i) continue;  // draw each edge once
+            const dx = px[i] - px[j];
+            const dy = py[i] - py[j];
+            const d2 = dx * dx + dy * dy;
+            if (d2 < distSq) drawEdge(i, j, Math.sqrt(d2), connectDist, hueShift);
+          }
+        }
+      }
+    }
+
+    /* nodes pass */
+    for (let i = 0; i < N; i++) {
+      if (py[i] < -60 || py[i] > H + 60) continue;
+      const pulse = Math.sin(t * 1.6 + phase[i]) * 0.5 + 0.5;
+      drawNode(i, pulse);
+    }
+  }
+
+  /* ── init & start ── */
+  resize();
+  initNodes();
+  window.addEventListener('resize', () => { resize(); initNodes(); }, { passive: true });
+  frame();
+}
+
+/* ════════════════════════════════════════════════════════════
    MIST CANVAS — global mouse-interactive violet fog
    Fixed canvas behind the entire page, always running.
 ════════════════════════════════════════════════════════════ */
@@ -444,12 +715,12 @@ function initMistCanvas() {
   /* Orb definitions (normalised 0-1 coords) */
   const orbs = [
     /* Primary — follows mouse with soft lerp */
-    { ox: 0.5,  oy: 0.4,  r: 0.65, a: 0.22, speed: 0.055, drift: null },
+    { ox: 0.5,  oy: 0.4,  r: 0.70, a: 0.28, speed: 0.055, drift: null },
     /* Secondary — slow autonomous drift */
-    { ox: 0.2,  oy: 0.3,  r: 0.45, a: 0.12, speed: 0,     drift: { vx:  0.00010, vy:  0.00007 } },
-    { ox: 0.75, oy: 0.6,  r: 0.42, a: 0.11, speed: 0,     drift: { vx: -0.00009, vy:  0.00010 } },
-    { ox: 0.5,  oy: 0.9,  r: 0.35, a: 0.08, speed: 0,     drift: { vx:  0.00007, vy: -0.00009 } },
-    { ox: 0.85, oy: 0.15, r: 0.30, a: 0.07, speed: 0,     drift: { vx: -0.00006, vy:  0.00008 } },
+    { ox: 0.2,  oy: 0.3,  r: 0.52, a: 0.16, speed: 0,     drift: { vx:  0.00010, vy:  0.00007 } },
+    { ox: 0.75, oy: 0.6,  r: 0.48, a: 0.14, speed: 0,     drift: { vx: -0.00009, vy:  0.00010 } },
+    { ox: 0.5,  oy: 0.9,  r: 0.40, a: 0.11, speed: 0,     drift: { vx:  0.00007, vy: -0.00009 } },
+    { ox: 0.85, oy: 0.15, r: 0.35, a: 0.09, speed: 0,     drift: { vx: -0.00006, vy:  0.00008 } },
   ];
 
   /* Violet RGB values matching --accent #8B5CF6 */
@@ -464,7 +735,8 @@ function initMistCanvas() {
 
     const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
     grad.addColorStop(0,    `rgba(${R},${G},${B},${orb.a})`);
-    grad.addColorStop(0.4,  `rgba(${R},${G},${B},${(orb.a * 0.35).toFixed(3)})`);
+    grad.addColorStop(0.25, `rgba(${R},${G},${B},${(orb.a * 0.70).toFixed(3)})`);
+    grad.addColorStop(0.55, `rgba(${R},${G},${B},${(orb.a * 0.30).toFixed(3)})`);
     grad.addColorStop(1,    `rgba(${R},${G},${B},0)`);
 
     ctx.fillStyle = grad;

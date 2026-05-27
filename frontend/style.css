@@ -93,14 +93,15 @@ body {
 /* ════════════════════════════════════════════════════════════
    TOP NAV
 ════════════════════════════════════════════════════════════ */
-/* All page content sits above the fixed mist canvas */
-body > *:not(#mistCanvas) {
+/* All page content (except canvases) sits above canvas layers */
+body > *:not(#mistCanvas):not(#neuralCanvas) {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 #nav {
-  position: sticky;
+  /* sticky must not be overridden — explicit declaration wins */
+  position: sticky !important;
   top: 0;
   z-index: 50;
   height: 64px;
@@ -111,24 +112,26 @@ body > *:not(#mistCanvas) {
   background: transparent;
   backdrop-filter: blur(0px);
   -webkit-backdrop-filter: blur(0px);
-  border-bottom: 1px solid transparent;
+  border: none;
+  outline: none;
+  opacity: 0;
   transition:
     background var(--dur-slow) ease,
-    border-color var(--dur-slow) ease,
+    box-shadow var(--dur-slow) ease,
     backdrop-filter var(--dur-slow) ease;
-  transform: translateY(-100%);
-  animation: navSlideDown 0.5s var(--ease-out-expo) 0.1s forwards;
+  animation: navFadeIn 0.5s var(--ease-out-expo) 0.15s forwards;
+}
+
+@keyframes navFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 #nav.scrolled {
-  background: rgba(10, 10, 11, 0.70);
+  background: rgba(10, 10, 11, 0.75);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom-color: var(--border);
-}
-
-@keyframes navSlideDown {
-  to { transform: translateY(0); }
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .nav-brand {
@@ -138,17 +141,12 @@ body > *:not(#mistCanvas) {
   text-decoration: none;
 }
 
-.nav-emoji {
-  font-size: 22px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
 .nav-wordmark {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
-  letter-spacing: -0.3px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 
 .nav-links {
@@ -185,14 +183,24 @@ body > *:not(#mistCanvas) {
   padding: 80px 32px 48px;
 }
 
-/* Global mouse-interactive mist canvas — fixed behind everything */
-#mistCanvas {
+/* Neural network particle canvas — deepest layer */
+#neuralCanvas {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
   pointer-events: none;
   z-index: 0;
+}
+
+/* Global mouse-interactive mist canvas — above neural */
+#mistCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .hero-inner {
@@ -921,17 +929,6 @@ input[type="file"] {
 
 .steps { display: flex; flex-direction: column; position: relative; }
 
-/* Vertical timeline line — subtle, not a hard divider */
-.steps::before {
-  content: '';
-  position: absolute;
-  left: 38px;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.05) 20%, rgba(255,255,255,0.05) 80%, transparent);
-}
-
 .step {
   display: grid;
   grid-template-columns: 80px 1fr;
@@ -949,6 +946,19 @@ input[type="file"] {
   padding-top: 2px;
   position: relative;
   z-index: 1;
+}
+
+/* Vertical connector: starts below the dot, ends at the top of the next dot */
+.step:not(:last-child) .step-index-wrap::after {
+  content: '';
+  position: absolute;
+  top: calc(2px + 28px + 4px); /* padding-top + dot height + gap */
+  bottom: calc(-36px - 2px);   /* reach into next step's padding, stop before its dot */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+  z-index: 0;
 }
 
 .step-index {
@@ -973,6 +983,7 @@ input[type="file"] {
   background: var(--accent);
   border-color: var(--accent);
   color: white;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.4);
 }
 
 .step-right {
@@ -1045,17 +1056,15 @@ input[type="file"] {
 .feature-item::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--accent);
-  transform: scaleY(0);
-  transform-origin: top;
-  transition: transform var(--dur-base) var(--ease-out-cubic);
+  inset: 0;
+  border-radius: var(--radius-md);
+  background: rgba(139, 92, 246, 0.04);
+  opacity: 0;
+  transition: opacity var(--dur-base) ease;
+  pointer-events: none;
 }
 
-.feature-item:hover::before { transform: scaleY(1); }
+.feature-item:hover::before { opacity: 1; }
 .feature-item:nth-child(odd)  { padding-right: 40px; }
 .feature-item:nth-child(even) { padding-left: 40px; }
 
@@ -1064,7 +1073,10 @@ input[type="file"] {
   font-size: 13px;
   color: var(--text-muted);
   padding-top: 2px;
+  transition: color var(--dur-base) ease;
 }
+
+.feature-item:hover .feature-num { color: var(--accent); }
 
 .feature-name {
   font-size: 15px;
@@ -1072,7 +1084,10 @@ input[type="file"] {
   color: var(--text-primary);
   margin-bottom: 6px;
   letter-spacing: -0.2px;
+  transition: color var(--dur-base) ease;
 }
+
+.feature-item:hover .feature-name { color: var(--accent-hover); }
 
 .feature-desc {
   font-size: 13px;
@@ -1220,7 +1235,7 @@ footer {
   .app-controls { flex-direction: column; align-items: stretch; }
   .btn-analyze { justify-content: center; }
 
-  .steps::before { display: none; }
+  .step:not(:last-child) .step-index-wrap::after { display: none; }
 
   .nav-links .nav-link:not(:last-child) { display: none; }
 }

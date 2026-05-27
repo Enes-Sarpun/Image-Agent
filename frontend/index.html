@@ -86,7 +86,9 @@
 
 <body>
 
-  <!-- Global mist canvas — fixed, behind everything -->
+  <!-- Neural network particle canvas — fixed, scroll-aware, behind mist -->
+  <canvas id="neuralCanvas" aria-hidden="true"></canvas>
+  <!-- Global mist canvas — fixed, on top of neural -->
   <canvas id="mistCanvas" aria-hidden="true"></canvas>
 
   <!-- Toast Container -->
@@ -97,7 +99,6 @@
   ════════════════════════════════ -->
   <nav id="nav">
     <a href="#hero" class="nav-brand">
-      <span class="nav-emoji">🙂</span>
       <span class="nav-wordmark">ImageAgent</span>
     </a>
     <div class="nav-links">
