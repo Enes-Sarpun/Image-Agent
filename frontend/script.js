@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initParallax();
   initNeuralCanvas();
   initMistCanvas();
-  initTypewriter();
+  initStatement();
   initPipelineObserver();
 });
 
@@ -48,31 +48,49 @@ function initNav() {
     nav.classList.toggle('scrolled', window.scrollY > 8);
   }, { passive: true });
 
-  /* ── Glider: dynamic position via getBoundingClientRect ── */
+  /* ── Glider ── */
   const glider  = document.getElementById('navGlider');
   const segment = document.getElementById('navSegment');
   if (!glider || !segment) return;
 
   const segLinks = Array.from(segment.querySelectorAll('.nav-link'));
 
+  // Suppress scroll-spy for a bit after a click so it doesn't override mid-scroll
+  let ignoreScrollSpy = false;
+  let ignoreTimer     = null;
+
   function setActive(link) {
     segLinks.forEach(l => {
       l.classList.toggle('active', l === link);
       l.setAttribute('aria-current', l === link ? 'page' : 'false');
     });
-    // Position glider using live bounding rects (works at any viewport size)
     const segRect  = segment.getBoundingClientRect();
     const linkRect = link.getBoundingClientRect();
     glider.style.transform = `translateX(${linkRect.left - segRect.left}px)`;
     glider.style.width     = `${linkRect.width}px`;
   }
 
-  // Click on segment links
+  // Reposition without showing a transition (initial render, resize)
+  function snapActive(link) {
+    glider.style.transition = 'none';
+    setActive(link);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      glider.style.transition = '';
+    }));
+  }
+
+  // Click: move glider, then ignore scroll-spy for ~900 ms (smooth scroll duration)
   segLinks.forEach(link => {
-    link.addEventListener('click', () => setActive(link));
+    link.addEventListener('click', () => {
+      setActive(link);
+      ignoreScrollSpy = true;
+      clearTimeout(ignoreTimer);
+      ignoreTimer = setTimeout(() => { ignoreScrollSpy = false; }, 900);
+    });
   });
 
-  // Scroll-spy: track which section is most visible
+  // Scroll-spy: use scroll events (more reliable than IntersectionObserver for
+  // scroll + click combos — doesn't have the "fires only on change" limitation)
   const sections = segLinks
     .map(l => l.getAttribute('href'))
     .filter(h => h && h.startsWith('#'))
@@ -80,28 +98,36 @@ function initNav() {
     .filter(Boolean);
 
   if (sections.length) {
-    const spy = new IntersectionObserver((entries) => {
-      const visible = entries.filter(e => e.isIntersecting);
-      if (!visible.length) return;
-      const best = visible.reduce((a, b) =>
-        a.intersectionRatio >= b.intersectionRatio ? a : b
-      );
-      const href  = '#' + best.target.id;
-      const match = segLinks.find(l => l.getAttribute('href') === href);
-      if (match) setActive(match);
-    }, { threshold: [0.2, 0.5] });
-    sections.forEach(s => spy.observe(s));
+    let rafSpy = null;
+    window.addEventListener('scroll', () => {
+      if (ignoreScrollSpy) return;
+      cancelAnimationFrame(rafSpy);
+      rafSpy = requestAnimationFrame(() => {
+        // Activate the section whose top most recently passed 35% of the viewport
+        const trigger = window.scrollY + window.innerHeight * 0.35;
+        let best    = null;
+        let bestTop = -Infinity;
+        sections.forEach(s => {
+          const top = s.getBoundingClientRect().top + window.scrollY;
+          if (top <= trigger && top > bestTop) { bestTop = top; best = s; }
+        });
+        if (best) {
+          const match = segLinks.find(l => l.getAttribute('href') === '#' + best.id);
+          if (match) setActive(match);
+        }
+      });
+    }, { passive: true });
   }
 
-  // Initial render (wait one frame so layout is settled)
+  // Initial render: snap without animation so glider doesn't slide in from 0
   requestAnimationFrame(() => {
-    if (segLinks[0]) setActive(segLinks[0]);
+    if (segLinks[0]) snapActive(segLinks[0]);
   });
 
-  // Recalculate glider position on window resize
+  // Resize: reposition instantly, no animation
   window.addEventListener('resize', () => {
     const active = segment.querySelector('.nav-link.active') || segLinks[0];
-    if (active) requestAnimationFrame(() => setActive(active));
+    if (active) requestAnimationFrame(() => snapActive(active));
   }, { passive: true });
 }
 
@@ -914,81 +940,160 @@ function initMistCanvas() {
 /* ════════════════════════════════════════════════════════════
    TYPEWRITER — statement section
 ════════════════════════════════════════════════════════════ */
-function initTypewriter() {
-  const container = document.getElementById('statementText');
-  const template  = document.getElementById('statementRaw');
-  if (!container || !template) return;
+/* ════════════════════════════════════════════════════════════
+   STATEMENT — carousel + typewriter on first card
+════════════════════════════════════════════════════════════ */
+function initStatement() {
+  /* ── Quote bank ── */
+  const QUOTES = [
+    {
+      label:    'TESPİT',
+      text:     'Midjourney, Stable Diffusion ve Flux gibi modeller\nartık insan gözünü kolayca yanıltıyor.\n\nImage Agent, buna çok katmanlı bir yanıt sunuyor.',
+      boldPart: 'Image Agent, buna çok katmanlı bir yanıt sunuyor.',
+    },
+    {
+      label:    'ANALİZ',
+      text:     'Bir görsel bin kelime söyler.\nAma AI görselleri binlerce yalan fısıldar.\n\nImage Agent, her pikseli sorgular.',
+      boldPart: 'Image Agent, her pikseli sorgular.',
+    },
+    {
+      label:    'GERÇEK',
+      text:     'Deepfake çağında gerçeği bulmak\nbir uzmanlık meselesi haline geldi.\n\nImage Agent, bu uzmanlığı herkese sunar.',
+      boldPart: 'Image Agent, bu uzmanlığı herkese sunar.',
+    },
+    {
+      label:    'TEKNOLOJİ',
+      text:     'Görsel doğruluğu artık sezgiyle değil,\n7 katmanlı analiz ile belirlenir.\n\nImage Agent, sonuçları saniyeler içinde verir.',
+      boldPart: 'Image Agent, sonuçları saniyeler içinde verir.',
+    },
+    {
+      label:    'SORU',
+      text:     'Her gün milyonlarca AI görseli üretiliyor.\nSen hangisinin gerçek olduğunu nasıl bileceksin?\n\nImage Agent biliyor.',
+      boldPart: 'Image Agent biliyor.',
+    },
+  ];
 
-  const raw     = template.content.textContent.trim();
-  const typed   = container.querySelector('.statement-typed');
-  const cursor  = container.querySelector('.typewriter-cursor');
+  const card    = document.getElementById('statementCard');
+  const labelEl = document.getElementById('statementLabel');
+  const typedEl = document.getElementById('statementText')?.querySelector('.statement-typed');
+  const cursor  = document.getElementById('statementText')?.querySelector('.typewriter-cursor');
+  const dotsEl  = document.getElementById('statementDots');
+  if (!card || !typedEl) return;
 
-  /* Split into segments: plain text or <strong>...</strong> */
-  const STRONG_MARKER = '[[STRONG]]';
-  const STRONG_END    = '[[/STRONG]]';
-  const rawMarked = raw
-    .replace('Image Agent, buna çok katmanlı bir yanıt sunuyor.', `${STRONG_MARKER}Image Agent, buna çok katmanlı bir yanıt sunuyor.${STRONG_END}`);
+  let current  = 0;
+  let carTimer = null;
 
-  /* Build flat char array with metadata */
-  const chars = [];
-  let inStrong = false;
-  let i = 0;
-  while (i < rawMarked.length) {
-    if (rawMarked.startsWith(STRONG_MARKER, i)) {
-      inStrong = true;
-      i += STRONG_MARKER.length;
-    } else if (rawMarked.startsWith(STRONG_END, i)) {
-      inStrong = false;
-      i += STRONG_END.length;
-    } else if (rawMarked[i] === '\\' && rawMarked[i + 1] === 'n') {
-      chars.push({ ch: '\n', strong: inStrong });
-      i += 2;
-    } else {
-      chars.push({ ch: rawMarked[i], strong: inStrong });
-      i++;
-    }
+  /* ── Progress dots ── */
+  const dots = QUOTES.map((_, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'statement-dot';
+    btn.setAttribute('aria-label', `Alıntı ${i + 1}`);
+    btn.addEventListener('click', () => goTo(i));
+    if (dotsEl) dotsEl.appendChild(btn);
+    return btn;
+  });
+
+  function activateDot(i) {
+    dots.forEach((d, j) => d.classList.toggle('active', j === i));
   }
 
-  /* Speed: ms per character */
-  const CHAR_DELAY = 28;
-  let charIndex = 0;
-  let started   = false;
-
-  function renderChars() {
-    let html = '';
-    let openStrong = false;
-    for (let j = 0; j < charIndex; j++) {
-      const { ch, strong } = chars[j];
-      if (strong && !openStrong) { html += '<strong>'; openStrong = true; }
-      if (!strong && openStrong) { html += '</strong>'; openStrong = false; }
-      if (ch === '\n') { html += '<br>'; }
-      else             { html += ch; }
+  /* ── Render quote (instant, no typewriter) ── */
+  function renderQuote(i) {
+    const q = QUOTES[i];
+    if (labelEl) labelEl.textContent = q.label;
+    let html = q.text.split('\n').join('<br>');
+    if (q.boldPart) {
+      html = html.replace(q.boldPart, `<strong>${q.boldPart}</strong>`);
     }
-    if (openStrong) html += '</strong>';
-    typed.innerHTML = html;
+    typedEl.innerHTML = html;
+    if (cursor) cursor.style.display = 'none';
+    current = i;
+    activateDot(i);
   }
 
-  function typeNext() {
-    if (charIndex >= chars.length) {
-      /* Done — keep cursor blinking for a moment then hide */
-      setTimeout(() => { if (cursor) cursor.style.display = 'none'; }, 2000);
-      return;
-    }
-    charIndex++;
-    renderChars();
-    /* Slightly longer pause after sentence-ending punctuation */
-    const ch = chars[charIndex - 1].ch;
-    const delay = (ch === '.' || ch === '?' || ch === '!') ? CHAR_DELAY * 8 : CHAR_DELAY;
-    setTimeout(typeNext, delay);
+  /* ── Auto-advance timer ── */
+  function scheduleNext() {
+    clearTimeout(carTimer);
+    carTimer = setTimeout(() => goTo((current + 1) % QUOTES.length), 6000);
   }
 
-  /* Start typing when section scrolls into view */
-  const obs = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting && !started) {
-      started = true;
+  /* ── Transition to quote i with fade ── */
+  function goTo(i) {
+    if (i === current) { scheduleNext(); return; }
+    clearTimeout(carTimer);
+    card.classList.add('fading');
+    setTimeout(() => {
+      renderQuote(i);
+      card.classList.remove('fading');
+      scheduleNext();
+    }, 400);
+  }
+
+  /* ── Typewriter for the first card ── */
+  function runTypewriter(onDone) {
+    const q    = QUOTES[0];
+    const MARK = '\x01';  // begin bold
+    const MEND = '\x02';  // end bold
+    const src  = q.text.replace(q.boldPart, `${MARK}${q.boldPart}${MEND}`);
+
+    /* Build char array */
+    const chars = [];
+    let bold = false;
+    for (let i = 0; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === MARK) { bold = true;  continue; }
+      if (ch === MEND) { bold = false; continue; }
+      chars.push({ ch, bold });
+    }
+
+    if (cursor) cursor.style.display = '';
+    let idx = 0;
+
+    function renderChars() {
+      let html = '', open = false;
+      for (let j = 0; j < idx; j++) {
+        const { ch, bold: b } = chars[j];
+        if (b  && !open) { html += '<strong>'; open = true;  }
+        if (!b && open)  { html += '</strong>'; open = false; }
+        html += ch === '\n' ? '<br>' : ch;
+      }
+      if (open) html += '</strong>';
+      typedEl.innerHTML = html;
+    }
+
+    const CHAR_DELAY = 28;
+    function typeNext() {
+      if (idx >= chars.length) {
+        setTimeout(() => {
+          if (cursor) cursor.style.display = 'none';
+          onDone?.();
+        }, 1800);
+        return;
+      }
+      idx++;
+      renderChars();
+      const ch  = chars[idx - 1].ch;
+      const del = (ch === '.' || ch === '?' || ch === '!') ? CHAR_DELAY * 8 : CHAR_DELAY;
+      setTimeout(typeNext, del);
+    }
+
+    setTimeout(typeNext, 300);
+  }
+
+  /* ── Bootstrap ── */
+  activateDot(0);
+  if (labelEl) labelEl.textContent = QUOTES[0].label;
+  if (cursor)  cursor.style.display = '';
+
+  /* Start typewriter when section enters view */
+  const obs = new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting) {
       obs.disconnect();
-      setTimeout(typeNext, 300);
+      runTypewriter(() => {
+        /* Typewriter done → start carousel after a short pause */
+        setTimeout(scheduleNext, 1200);
+      });
     }
   }, { threshold: 0.3 });
-  obs.observe(container);
+  obs.observe(card);
 }

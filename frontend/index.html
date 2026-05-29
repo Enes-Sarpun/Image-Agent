@@ -238,27 +238,27 @@
   ════════════════════════════════ -->
   <section id="statement">
     <div class="statement-inner">
-      <div class="statement-card">
-        <!-- Header strip -->
+      <div class="statement-card" id="statementCard">
+        <!-- Header strip — label updated by JS -->
         <div class="statement-card-head">
-          <span class="statement-card-label">TESPİT</span>
+          <span class="statement-card-label" id="statementLabel">TESPİT</span>
           <span class="statement-card-dots">
             <span></span><span></span><span></span>
           </span>
         </div>
-        <!-- Content: typewriter lives here -->
+        <!-- Content: typewriter / carousel text lives here -->
         <div class="statement-card-content">
           <p class="statement-text" id="statementText" aria-live="polite">
             <span class="statement-typed"></span><span class="typewriter-cursor"></span>
           </p>
-          <!-- Raw text kept for JS to read -->
-          <template id="statementRaw">Midjourney, Stable Diffusion ve Flux gibi modeller\nartık insan gözünü kolayca yanıltıyor.\n\nImage Agent, buna çok katmanlı bir yanıt sunuyor.</template>
         </div>
         <!-- CTA button -->
         <div class="statement-card-footer">
           <a href="#app" class="statement-card-cta">Uygulamayı İncele</a>
         </div>
       </div>
+      <!-- Carousel progress dots — populated by JS -->
+      <div class="statement-dots" id="statementDots" aria-hidden="true"></div>
     </div>
   </section>
 

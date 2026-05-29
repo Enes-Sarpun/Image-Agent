@@ -111,7 +111,9 @@ body > *:not(#mistCanvas):not(#neuralCanvas) {
   /* sticky must not be overridden — explicit declaration wins */
   position: sticky !important;
   top: 0;
-  z-index: 60;
+  /* High z-index ensures nav always intercepts pointer events above every section */
+  z-index: 9999;
+  pointer-events: auto !important;
   height: 64px;
   display: flex;
   align-items: center;
@@ -127,12 +129,13 @@ body > *:not(#mistCanvas):not(#neuralCanvas) {
     background var(--dur-slow) ease,
     box-shadow var(--dur-slow) ease,
     backdrop-filter var(--dur-slow) ease;
+  /* No transform in animation — avoids persistent GPU layer that can break pointer-events on sticky */
   animation: navFadeIn 0.5s var(--ease-out-expo) 0.15s forwards;
 }
 
 @keyframes navFadeIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 #nav.scrolled {
@@ -1015,16 +1018,17 @@ input[type="file"] {
 #statement { background: var(--bg-section-elevated); }
 
 .statement-inner {
-  max-width: 680px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 96px 32px;
+  padding: 96px 48px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
 }
 
 /* ── Neobrutalist card adapted to dark/violet theme ── */
 .statement-card {
-  width: min(640px, 100%);
+  width: 100%;
   background: var(--bg-card);
   border: 2px solid var(--border-strong);
   border-radius: var(--radius-lg);
@@ -1034,13 +1038,50 @@ input[type="file"] {
   translate: -4px -4px;
   transition:
     translate      0.22s ease,
-    box-shadow     0.22s ease;
+    box-shadow     0.22s ease,
+    opacity        0.38s ease,
+    transform      0.38s ease;
   overflow: hidden;
 }
 
 .statement-card:hover {
   translate: 0 0;
   box-shadow: 4px 4px 0 rgba(139, 92, 246, 0.12);
+}
+
+/* Carousel fade-out state */
+.statement-card.fading {
+  opacity: 0;
+  transform: translateY(-5px);
+}
+
+/* ── Carousel progress dots ── */
+.statement-dots {
+  display: flex;
+  justify-content: center;
+  align-self: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.statement-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  background: var(--border-strong);
+  cursor: pointer;
+  transition: background 0.25s ease, transform 0.25s ease;
+}
+
+.statement-dot.active {
+  background: var(--accent);
+  transform: scale(1.4);
+}
+
+.statement-dot:hover:not(.active) {
+  background: var(--text-muted);
 }
 
 /* Header strip */
@@ -1077,15 +1118,15 @@ input[type="file"] {
 
 /* Content area */
 .statement-card-content {
-  padding: 36px 40px 28px;
-  text-align: center;
+  padding: 36px 48px 28px;
+  text-align: left;
 }
 
 /* Footer / CTA */
 .statement-card-footer {
-  padding: 0 40px 32px;
+  padding: 0 48px 36px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .statement-card-cta {
@@ -1397,7 +1438,7 @@ footer {
   position: fixed;
   top: 80px;
   right: 24px;
-  z-index: 100;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1461,10 +1502,10 @@ footer {
   #nav { padding: 0 20px; }
   #app { padding: 72px 20px; }
   .pipeline-inner, .features-inner { padding: 72px 20px; }
-  .statement-inner { padding-top: 72px; padding-bottom: 72px; padding-left: 16px; padding-right: 16px; }
+  .statement-inner { padding-top: 60px; padding-bottom: 60px; padding-left: 16px; padding-right: 16px; }
   .statement-card { box-shadow: 6px 6px 0 rgba(139, 92, 246, 0.18); translate: -2px -2px; }
-  .statement-card-content { padding: 24px 24px 20px; }
-  .statement-card-footer   { padding: 0 24px 24px; }
+  .statement-card-content { padding: 24px 24px 20px; text-align: left; }
+  .statement-card-footer   { padding: 0 24px 24px; justify-content: flex-start; }
   #hero { padding: 80px 20px 48px; }
 
   .feature-list { grid-template-columns: 1fr; }
@@ -1493,7 +1534,7 @@ footer {
     border: none;
     cursor: pointer;
     padding: 8px 4px;
-    z-index: 61;
+    z-index: 50;
   }
   .nav-hamburger span {
     display: block;
