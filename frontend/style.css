@@ -28,10 +28,12 @@
   --text-muted:     #A1A1AA;
   --text-disabled:  #3F3F46;
 
-  /* Accent — single violet */
+  /* Accent */
   --accent:       #8B5CF6;
   --accent-hover: #A78BFA;
   --accent-glow:  rgba(139, 92, 246, 0.15);
+  --accent-2:     #6366F1;
+  --grad-accent:  linear-gradient(135deg, #8B5CF6, #6366F1);
 
   /* Semantic (verdict only) */
   --success: #10B981;
@@ -71,6 +73,12 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
 
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 body {
   background: var(--bg-base);
   color: var(--text-primary);
@@ -103,7 +111,7 @@ body > *:not(#mistCanvas):not(#neuralCanvas) {
   /* sticky must not be overridden — explicit declaration wins */
   position: sticky !important;
   top: 0;
-  z-index: 50;
+  z-index: 60;
   height: 64px;
   display: flex;
   align-items: center;
@@ -128,10 +136,22 @@ body > *:not(#mistCanvas):not(#neuralCanvas) {
 }
 
 #nav.scrolled {
-  background: rgba(10, 10, 11, 0.75);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(10, 10, 11, 0.72);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Soft gradient scrim below nav — blends sticky bar into page content */
+#nav::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 24px;
+  background: linear-gradient(to bottom, rgba(10,10,11,0.55), transparent);
+  pointer-events: none;
 }
 
 .nav-brand {
@@ -168,6 +188,77 @@ body > *:not(#mistCanvas):not(#neuralCanvas) {
 .nav-link:hover { color: var(--text-primary); }
 
 .nav-link svg { flex-shrink: 0; }
+
+/* Ensure nav links are always above any stacking-context overlap */
+.nav-links,
+.nav-link {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+/* ── Segmented nav indicator ── */
+.nav-segment {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 0;
+}
+
+.nav-glider {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  height: calc(100% - 6px);
+  border-radius: calc(var(--radius-md) - 4px);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.38), rgba(99, 102, 241, 0.28));
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    width     0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+  width: 0;
+}
+
+.nav-segment .nav-link {
+  position: relative;
+  z-index: 1;
+  padding: 5px 14px;
+  border-radius: calc(var(--radius-md) - 4px);
+  font-size: 13px;
+  transition: color var(--dur-fast) ease;
+}
+
+.nav-segment .nav-link.active {
+  color: var(--text-primary);
+}
+
+/* Hamburger — hidden on desktop, shown on mobile via media query */
+.nav-hamburger { display: none; }
+
+/* Hamburger X animation when menu is open */
+#nav.menu-open .nav-hamburger span:nth-child(1) {
+  transform: translateY(6.5px) rotate(45deg);
+}
+#nav.menu-open .nav-hamburger span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+#nav.menu-open .nav-hamburger span:nth-child(3) {
+  transform: translateY(-6.5px) rotate(-45deg);
+}
+
+/* Anchor clearance — prevents headings from hiding under sticky nav */
+#app,
+#pipeline,
+#features,
+#statement {
+  scroll-margin-top: 84px;
+}
 
 /* ════════════════════════════════════════════════════════════
    HERO
@@ -242,12 +333,18 @@ body > *:not(#mistCanvas):not(#neuralCanvas) {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   opacity: 0;
-  animation: titleIn 0.9s var(--ease-out-expo) 0.35s forwards;
+  animation: titleIn 0.9s var(--ease-out-expo) 0.35s forwards, heroShimmer 8s ease 1.25s infinite;
 }
 
 @keyframes titleIn {
   from { opacity: 0; transform: translateY(32px); filter: blur(8px); }
   to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+
+@keyframes heroShimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .hero-tagline {
@@ -358,6 +455,9 @@ body > *:not(#mistCanvas):not(#neuralCanvas) {
   position: relative;
   min-height: 360px;
   background: var(--bg-card);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
   border: 1.5px dashed var(--border-strong);
   border-radius: var(--radius-xl);
   display: flex;
@@ -417,6 +517,7 @@ input[type="file"] {
   inset: 0;
   opacity: 0;
   cursor: pointer;
+  pointer-events: none; /* prevent native click from bubbling a second dialog */
 }
 
 /* Preview state */
@@ -528,7 +629,7 @@ input[type="file"] {
 .btn-analyze {
   height: 48px;
   padding: 0 32px;
-  background: var(--accent);
+  background: var(--grad-accent);
   color: white;
   border: none;
   border-radius: var(--radius-md);
@@ -548,9 +649,9 @@ input[type="file"] {
 }
 
 .btn-analyze:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: linear-gradient(135deg, var(--accent-hover), #818CF8);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-glow);
+  box-shadow: 0 0 32px rgba(139, 92, 246, 0.35), var(--shadow-glow);
 }
 
 .btn-analyze:active:not(:disabled) {
@@ -563,22 +664,47 @@ input[type="file"] {
   cursor: not-allowed;
 }
 
-/* Spinner */
-.spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  display: none;
-  animation: spin 0.7s linear infinite;
-}
-
-.btn-analyze.loading .spinner { display: block; }
+/* Button loading state — icon hidden, text shows "Analiz ediliyor..." */
 .btn-analyze.loading .btn-icon { display: none; }
 
-@keyframes spin {
+/* ── Result loader: RGB glow ring ── */
+.result-loader {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: 360px;
+}
+.result-loader.visible { display: flex; }
+
+.loader-ring {
+  width: 3em;
+  height: 3em;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    #ff3333  0%,
+    #ff9900 16%,
+    #ffff00 33%,
+    #33ff77 50%,
+    #3399ff 66%,
+    #9933ff 83%,
+    #ff3333 100%
+  );
+  /* Donut mask: keep only the outer ring */
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #fff calc(100% - 3px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #fff calc(100% - 3px));
+  animation: rot55 1.2s linear infinite;
+  filter:
+    drop-shadow(0 0 8px rgba(255, 100,  80, 0.55))
+    drop-shadow(0 0 16px rgba(100,  80, 255, 0.40));
+}
+
+@keyframes rot55 {
   to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader-ring { animation: none; }
 }
 
 /* ── Result Panel ── */
@@ -590,6 +716,9 @@ input[type="file"] {
 .empty-state {
   min-height: 360px;
   background: var(--bg-card);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
   border: 1.5px dashed var(--border);
   border-radius: var(--radius-xl);
   display: flex;
@@ -619,6 +748,9 @@ input[type="file"] {
 .skeleton-card {
   min-height: 360px;
   background: var(--bg-card);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: 40px;
@@ -654,6 +786,9 @@ input[type="file"] {
 /* Verdict Card */
 .verdict-card {
   background: var(--bg-card);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: 40px;
@@ -825,6 +960,8 @@ input[type="file"] {
   justify-content: space-between;
   padding: 16px 20px;
   background: var(--bg-card);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: var(--radius-lg);
   cursor: pointer;
@@ -878,10 +1015,95 @@ input[type="file"] {
 #statement { background: var(--bg-section-elevated); }
 
 .statement-inner {
-  max-width: 820px;
+  max-width: 680px;
   margin: 0 auto;
   padding: 96px 32px;
-  text-align: left;
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Neobrutalist card adapted to dark/violet theme ── */
+.statement-card {
+  width: min(640px, 100%);
+  background: var(--bg-card);
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 10px 10px 0 rgba(139, 92, 246, 0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  translate: -4px -4px;
+  transition:
+    translate      0.22s ease,
+    box-shadow     0.22s ease;
+  overflow: hidden;
+}
+
+.statement-card:hover {
+  translate: 0 0;
+  box-shadow: 4px 4px 0 rgba(139, 92, 246, 0.12);
+}
+
+/* Header strip */
+.statement-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 24px;
+  background: rgba(139, 92, 246, 0.10);
+  border-bottom: 2px solid var(--border-strong);
+}
+
+.statement-card-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--accent-hover);
+}
+
+.statement-card-dots {
+  display: flex;
+  gap: 6px;
+}
+.statement-card-dots span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+.statement-card-dots span:nth-child(1) { background: rgba(255, 80,  80, 0.55); }
+.statement-card-dots span:nth-child(2) { background: rgba(255, 180, 50, 0.55); }
+.statement-card-dots span:nth-child(3) { background: rgba(80,  200, 80, 0.55); }
+
+/* Content area */
+.statement-card-content {
+  padding: 36px 40px 28px;
+  text-align: center;
+}
+
+/* Footer / CTA */
+.statement-card-footer {
+  padding: 0 40px 32px;
+  display: flex;
+  justify-content: center;
+}
+
+.statement-card-cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 24px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background var(--dur-fast) ease, translate 0.15s ease;
+}
+
+.statement-card-cta:hover {
+  background: var(--accent-hover);
+  translate: 0 -2px;
 }
 
 .statement-text {
@@ -889,13 +1111,22 @@ input[type="file"] {
   font-style: italic;
   font-weight: 400;
   font-size: clamp(20px, 3vw, 34px);
-  line-height: 1.65;
-  color: rgba(255,255,255,0.55);
+  line-height: 1.7;
+  color: rgba(255,255,255,0.72);
 }
 
 .statement-text strong {
-  color: var(--text-primary);
   font-weight: 400;
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    var(--accent-hover) 50%,
+    #ffffff 100%
+  );
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* Typewriter cursor blinks after typing finishes */
@@ -1003,6 +1234,15 @@ input[type="file"] {
 
 .step:hover .step-label { color: var(--text-primary); }
 
+/* Active step highlighted via IntersectionObserver */
+.step.active .step-index {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.4);
+}
+.step.active .step-label { color: var(--text-primary); }
+
 .step-desc {
   font-size: 13px;
   color: var(--text-muted);
@@ -1100,7 +1340,7 @@ input[type="file"] {
 ════════════════════════════════════════════════════════════ */
 footer {
   background: var(--bg-section-base);
-  border-top: none;
+  border-top: 1px solid var(--border);
   padding: 28px 32px;
   display: flex;
   align-items: center;
@@ -1219,7 +1459,12 @@ footer {
 
 @media (max-width: 720px) {
   #nav { padding: 0 20px; }
-  #app, .pipeline-inner, .features-inner { padding-left: 20px; padding-right: 20px; }
+  #app { padding: 72px 20px; }
+  .pipeline-inner, .features-inner { padding: 72px 20px; }
+  .statement-inner { padding-top: 72px; padding-bottom: 72px; padding-left: 16px; padding-right: 16px; }
+  .statement-card { box-shadow: 6px 6px 0 rgba(139, 92, 246, 0.18); translate: -2px -2px; }
+  .statement-card-content { padding: 24px 24px 20px; }
+  .statement-card-footer   { padding: 0 24px 24px; }
   #hero { padding: 80px 20px 48px; }
 
   .feature-list { grid-template-columns: 1fr; }
@@ -1237,7 +1482,60 @@ footer {
 
   .step:not(:last-child) .step-index-wrap::after { display: none; }
 
-  .nav-links .nav-link:not(:last-child) { display: none; }
+  /* Hamburger button */
+  .nav-hamburger {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 4px;
+    z-index: 61;
+  }
+  .nav-hamburger span {
+    display: block;
+    width: 20px;
+    height: 1.5px;
+    background: var(--text-secondary);
+    border-radius: 2px;
+    transition: transform var(--dur-base) ease, opacity var(--dur-base) ease, transform var(--dur-base) ease;
+  }
+
+  /* Mobile nav overlay */
+  .nav-links {
+    display: none;
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(10, 10, 11, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 36px;
+    z-index: 49;
+  }
+  .nav-links.open { display: flex; }
+  .nav-links .nav-link {
+    font-size: 20px;
+    color: var(--text-secondary);
+    pointer-events: auto;
+  }
+  /* Show all links in the mobile overlay */
+  .nav-links .nav-link { display: flex; }
+
+  /* In mobile overlay: flatten the segment so its links join the overlay's flex flow */
+  .nav-segment {
+    display: contents;
+  }
+  /* Glider makes no sense in a vertical overlay */
+  .nav-glider { display: none; }
 }
 
 @media (max-width: 480px) {

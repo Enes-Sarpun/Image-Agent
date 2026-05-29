@@ -101,14 +101,24 @@
     <a href="#hero" class="nav-brand">
       <span class="nav-wordmark">ImageAgent</span>
     </a>
-    <div class="nav-links">
-      <a href="#app" class="nav-link">Uygulama</a>
-      <a href="#pipeline" class="nav-link">Nasıl Çalışır</a>
+    <div class="nav-links" id="navLinks">
+      <!-- Segmented indicator wraps the two internal nav links -->
+      <div class="nav-segment" id="navSegment">
+        <span class="nav-glider" id="navGlider"></span>
+        <a href="#app" class="nav-link" data-section="app">Uygulama</a>
+        <a href="#pipeline" class="nav-link" data-section="pipeline">Nasıl Çalışır</a>
+      </div>
+      <!-- GitHub stays outside the segment (external link) -->
       <a href="https://github.com/Enes-Sarpun/Image-Agent" target="_blank" rel="noopener" class="nav-link">
         <svg width="14" height="14"><use href="#icon-github"/></svg>
         GitHub
       </a>
     </div>
+    <button class="nav-hamburger" id="navHamburger" aria-label="Menüyü aç" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
   </nav>
 
   <!-- ════════════════════════════════
@@ -167,7 +177,6 @@
           </label>
 
           <button class="btn-analyze" id="analyzeBtn" disabled>
-            <div class="spinner"></div>
             <svg class="btn-icon" width="16" height="16"><use href="#icon-search"/></svg>
             <span class="btn-text">Analiz Et</span>
           </button>
@@ -184,14 +193,9 @@
           <span class="empty-state-hint">Bir görsel yükleyin,<br>sonuç burada görünecek.</span>
         </div>
 
-        <!-- Skeleton -->
-        <div class="skeleton-card" id="skeletonCard">
-          <div class="skeleton-line tall"></div>
-          <div class="skeleton-line wide"></div>
-          <div class="skeleton-line short" style="margin-bottom:32px;"></div>
-          <div class="skeleton-line wide"></div>
-          <div class="skeleton-line med"></div>
-          <div class="skeleton-line wide"></div>
+        <!-- Loading state: RGB ring -->
+        <div class="result-loader" id="resultLoader">
+          <div class="loader-ring"></div>
         </div>
 
         <!-- Verdict Card -->
@@ -234,11 +238,27 @@
   ════════════════════════════════ -->
   <section id="statement">
     <div class="statement-inner">
-      <p class="statement-text" id="statementText" aria-live="polite">
-        <span class="statement-typed"></span><span class="typewriter-cursor"></span>
-      </p>
-      <!-- Raw text kept for JS to read -->
-      <template id="statementRaw">Midjourney, Stable Diffusion ve Flux gibi modeller\nartık insan gözünü kolayca yanıltıyor.\n\nImage Agent, buna çok katmanlı bir yanıt sunuyor.</template>
+      <div class="statement-card">
+        <!-- Header strip -->
+        <div class="statement-card-head">
+          <span class="statement-card-label">TESPİT</span>
+          <span class="statement-card-dots">
+            <span></span><span></span><span></span>
+          </span>
+        </div>
+        <!-- Content: typewriter lives here -->
+        <div class="statement-card-content">
+          <p class="statement-text" id="statementText" aria-live="polite">
+            <span class="statement-typed"></span><span class="typewriter-cursor"></span>
+          </p>
+          <!-- Raw text kept for JS to read -->
+          <template id="statementRaw">Midjourney, Stable Diffusion ve Flux gibi modeller\nartık insan gözünü kolayca yanıltıyor.\n\nImage Agent, buna çok katmanlı bir yanıt sunuyor.</template>
+        </div>
+        <!-- CTA button -->
+        <div class="statement-card-footer">
+          <a href="#app" class="statement-card-cta">Uygulamayı İncele</a>
+        </div>
+      </div>
     </div>
   </section>
 
